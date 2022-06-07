@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
@@ -30,6 +32,7 @@ public class ConsulSubmittedJobGraphStoreTest extends AbstractConsulTest {
     private ConsulClient client;
     private Configuration configuration;
 	private String jobgraphsPath = "test-jobgraphs/";
+	private Executor executor;
 
 
 	@Before
@@ -39,6 +42,7 @@ public class ConsulSubmittedJobGraphStoreTest extends AbstractConsulTest {
         // Provide a HA_STORAGE_PATH
         configuration = new Configuration();
         configuration.setString(HighAvailabilityOptions.HA_STORAGE_PATH, tmpFolder.newFolder().getAbsolutePath());
+        executor = Executors.newCachedThreadPool();
 	}
 
 	@Test
@@ -74,6 +78,42 @@ public class ConsulSubmittedJobGraphStoreTest extends AbstractConsulTest {
         JobGraph jobGraph = createJobGraph(jobID);
 		graphStore1.putJobGraph(jobGraph);
 		graphStore1.removeJobGraph(jobID);
+		verify(listener).onRemovedJobGraph(jobID);
+
+		graphStore1.recoverJobGraph(jobID);
+	}
+
+	@Test(expected = FlinkException.class)
+	public void testLocalCleanupAsync() throws Exception {
+		ConsulSubmittedJobGraphStore graphStore1 = new ConsulSubmittedJobGraphStore(configuration, () -> client, jobgraphsPath);
+
+		JobGraphStore.JobGraphListener listener = mock(JobGraphStore.JobGraphListener.class);
+
+		graphStore1.start(listener);
+		JobID jobID = JobID.generate();
+
+		JobGraph jobGraph = createJobGraph(jobID);
+		graphStore1.putJobGraph(jobGraph);
+		graphStore1.localCleanupAsync(jobID, executor).join();
+
+		verify(listener).onRemovedJobGraph(jobID);
+
+		graphStore1.recoverJobGraph(jobID);
+	}
+
+	@Test(expected = FlinkException.class)
+	public void testGlobalCleanupAsync() throws Exception {
+		ConsulSubmittedJobGraphStore graphStore1 = new ConsulSubmittedJobGraphStore(configuration, () -> client, jobgraphsPath);
+
+		JobGraphStore.JobGraphListener listener = mock(JobGraphStore.JobGraphListener.class);
+
+		graphStore1.start(listener);
+		JobID jobID = JobID.generate();
+
+		JobGraph jobGraph = createJobGraph(jobID);
+		graphStore1.putJobGraph(jobGraph);
+		graphStore1.globalCleanupAsync(jobID, executor).join();
+
 		verify(listener).onRemovedJobGraph(jobID);
 
 		graphStore1.recoverJobGraph(jobID);
