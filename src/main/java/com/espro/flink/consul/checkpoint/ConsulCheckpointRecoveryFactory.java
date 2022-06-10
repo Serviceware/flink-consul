@@ -27,9 +27,11 @@ public final class ConsulCheckpointRecoveryFactory implements CheckpointRecovery
 
     private final Supplier<ConsulClient> client;
 	private final Configuration configuration;
+	private final Executor executor;
 
-    public ConsulCheckpointRecoveryFactory(Supplier<ConsulClient> client, Configuration configuration) {
-        this.client = Preconditions.checkNotNull(client, "client");
+	public ConsulCheckpointRecoveryFactory(Supplier<ConsulClient> client, Configuration configuration, Executor executor) {
+		this.executor = executor;
+		this.client = Preconditions.checkNotNull(client, "client");
 		this.configuration = Preconditions.checkNotNull(configuration, "configuration");
 	}
 
@@ -46,7 +48,7 @@ public final class ConsulCheckpointRecoveryFactory implements CheckpointRecovery
 		SharedStateRegistry sharedStateRegistry = sharedStateRegistryFactory.create(ioExecutor, completedCheckpoints, restoreMode);
 
 		return new DefaultCompletedCheckpointStore<>(maxNumberOfCheckpointsToRetain, consulStateHandleStore, consulCheckpointStoreUtil, completedCheckpoints, sharedStateRegistry,
-                ioExecutor);
+                executor);
 	}
 
 	@Override

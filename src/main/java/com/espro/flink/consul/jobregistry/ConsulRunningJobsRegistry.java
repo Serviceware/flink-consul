@@ -3,13 +3,11 @@ package com.espro.flink.consul.jobregistry;
 import static java.text.MessageFormat.format;
 
 import java.io.IOException;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.highavailability.JobResultEntry;
 import org.apache.flink.runtime.highavailability.JobResultStore;
@@ -54,32 +52,20 @@ public final class ConsulRunningJobsRegistry implements JobResultStore {
 
 	@Override
 	public boolean hasDirtyJobResultEntry(JobID jobID) throws IOException {
-		GetValue value = client.get().getKVValue(path(JobStatus.DIRTY)).getValue();
-		if (value == null) {
-			return false;
-		}
-		Set<String> jobs = convertToSet(value.getDecodedValue());
-		return jobs.contains(jobID.toString());
+		Set<String> jobResultEntries = getJobResultEntries(JobStatus.DIRTY);
+		return checkJobsContainId(jobResultEntries, jobID);
 	}
 
 	@Override
 	public boolean hasCleanJobResultEntry(JobID jobID) throws IOException {
-		GetValue value = client.get().getKVValue(path(JobStatus.CLEAN)).getValue();
-		if (value == null) {
-			return false;
-		}
-		Set<String> jobs = convertToSet(value.getDecodedValue());
-		return jobs.contains(jobID.toString());
+		Set<String> jobResultEntries = getJobResultEntries(JobStatus.CLEAN);
+		return checkJobsContainId(jobResultEntries, jobID);
 	}
 
 	@Override
 	public Set<JobResult> getDirtyResults() throws IOException {
-		GetValue value = client.get().getKVValue(path(JobStatus.DIRTY)).getValue();
-		if (value == null) {
-			return new HashSet<>();
-		}
-		Set<String> jobIds = convertToSet(value.getDecodedValue());
-		return jobIds.stream()
+		Set<String> jobResultEntries = getJobResultEntries(JobStatus.DIRTY);
+		return jobResultEntries.stream()
 				.map(id -> new JobResult.Builder().jobId(new JobID(StringUtils.hexStringToByte(id))).netRuntime(1).build())
 				.collect(Collectors.toSet());
 	}
@@ -87,7 +73,10 @@ public final class ConsulRunningJobsRegistry implements JobResultStore {
 	private void storeJobStatus(JobID jobID, JobStatus  status) {
 		PutParams params = new PutParams();
 		params.setAcquireSession(sessionHolder.getSessionId());
-		Set<String> jobList = getJobList(status);
+		Set<String> jobList = getJobResultEntries(status);
+		if (CollectionUtils.isEmpty(jobList)) {
+			jobList = new HashSet<>();
+		}
 		jobList.add(jobID.toString());
 		String jobIdsAsString = String.join(COMMA_SEPARATOR, jobList);
 		Boolean jobStatusStorageResult = client.get().setKVValue(path(status), jobIdsAsString, params).getValue();
@@ -100,13 +89,19 @@ public final class ConsulRunningJobsRegistry implements JobResultStore {
 		return jobRegistryPath + status.getValue();
 	}
 
-	private Set<String> getJobList(JobStatus  status) {
-		GetValue value = client.get().getKVValue(path(status)).getValue();
+	private Set<String> getJobResultEntries(JobStatus jobStatus) {
+		GetValue value = client.get().getKVValue(path(jobStatus)).getValue();
 		if (value == null) {
-			return new HashSet<>();
+			return Collections.emptySet();
 		}
-		String decodedValue = value.getDecodedValue();
-		return convertToSet(decodedValue);
+		return convertToSet(value.getDecodedValue());
+	}
+
+	private boolean checkJobsContainId(Set<String> jobResultEntries, JobID jobID) {
+		if (CollectionUtils.isEmpty(jobResultEntries)) {
+			return false;
+		}
+		return jobResultEntries.contains(jobID.toString());
 	}
 
 	private static Set<String> convertToSet(String jobs) {

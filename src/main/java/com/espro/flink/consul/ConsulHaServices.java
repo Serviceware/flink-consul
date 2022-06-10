@@ -144,7 +144,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 
 	@Override
 	public CheckpointRecoveryFactory getCheckpointRecoveryFactory() {
-        return new ConsulCheckpointRecoveryFactory(clientProvider, configuration);
+        return new ConsulCheckpointRecoveryFactory(clientProvider, configuration, executor);
 	}
 
 	@Override

@@ -74,7 +74,7 @@ public class ConsulRunningJobsRegistryTest extends AbstractConsulTest {
 		registry.createDirtyResult(createJobResult(jobID2));
 
 		JobID jobID3 = JobID.generate();
-		registry.markResultAsClean(jobID2);
+		registry.markResultAsClean(jobID3);
 
 		Set<JobResult> dirtyResults = registry.getDirtyResults();
 		Set<String> jobIds = dirtyResults.stream().map(jobResult -> jobResult.getJobId().toString()).collect(Collectors.toSet());
