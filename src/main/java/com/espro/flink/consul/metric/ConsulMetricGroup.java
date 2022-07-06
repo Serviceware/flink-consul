@@ -7,6 +7,9 @@ import org.apache.flink.runtime.metrics.groups.ComponentMetricGroup;
 
 import java.util.Collections;
 
+/**
+ * This class provides the Flink metric group to publish consul metrics.
+ */
 public class ConsulMetricGroup extends ComponentMetricGroup<ConsulMetricGroup> {
 
     public ConsulMetricGroup(MetricRegistry registry, String hostname) {

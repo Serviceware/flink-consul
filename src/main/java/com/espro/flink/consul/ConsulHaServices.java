@@ -27,7 +27,6 @@ import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricGroup;
 import com.espro.flink.consul.metric.ConsulMetricService;
-import com.espro.flink.consul.metric.ConsulMetricServiceImpl;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
@@ -105,7 +104,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 
 		MetricRegistry metricRegistry = createMetricRegistry(configuration);
 		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
-		this.consulMetricService = new ConsulMetricServiceImpl(metricRegistry, consulMetricGroup);
+		this.consulMetricService = new ConsulMetricService(metricRegistry, consulMetricGroup);
 
 		this.consulMetricService.registerDefaultMetrics();
         this.clientProvider = () -> ConsulClientFactory.createConsulClient(configuration);
@@ -221,6 +220,9 @@ public class ConsulHaServices implements HighAvailabilityServices {
 			+ configuration.getString(ConsulHighAvailabilityOptions.HA_CONSUL_JOBGRAPHS_PATH);
 	}
 
+	/**
+	 * This method is an entry point to register a metric to the Flink metric by creating MetricRegistry.
+	 * */
 	private MetricRegistry createMetricRegistry(Configuration configuration) {
 		RpcSystem rpcSystem = RpcSystem.load(configuration);
 		PluginManager pluginManager =

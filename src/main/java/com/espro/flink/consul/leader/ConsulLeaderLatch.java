@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
-import com.espro.flink.consul.utils.TimeUtils;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,7 +152,7 @@ final class ConsulLeaderLatch {
 			.build();
 		LocalDateTime startTime = LocalDateTime.now();
 		Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
-		setMetricValues(startTime);
+		this.consulMetricService.updateReadMetrics(startTime);
 		return leaderKeyValue.getValue();
 	}
 
@@ -164,7 +163,7 @@ final class ConsulLeaderLatch {
             ConsulLeaderData data = new ConsulLeaderData(nodeAddress, flinkSessionId);
 			LocalDateTime startTime = LocalDateTime.now();
             Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
-			setMetricValues(startTime);
+			this.consulMetricService.updateWriteMetrics(startTime);
 			return response != null ? response : false;
 		} catch (OperationException ex) {
             LOG.error("Error while writing leader key for {} with session id {} to Consul.", nodeAddress, flinkSessionId);
@@ -178,7 +177,7 @@ final class ConsulLeaderLatch {
 		try {
 			LocalDateTime startTime = LocalDateTime.now();
 			Boolean result = clientProvider.get().setKVBinaryValue(leaderKey, new byte[0], putParams).getValue();
-			setMetricValues(startTime);
+			this.consulMetricService.updateWriteMetrics(startTime);
 			return result;
 		} catch (OperationException ex) {
             LOG.error("Error while releasing leader key for session {}.", sessionHolder.getSessionId());
@@ -223,11 +222,4 @@ final class ConsulLeaderLatch {
             writeLeaderKey(leaderAddress);
         }
     }
-
-	private void setMetricValues(LocalDateTime requestStartTime) {
-		long durationTime = TimeUtils.getDurationTime(requestStartTime);
-		if (consulMetricService != null) {
-			this.consulMetricService.setMetricValues(durationTime);
-		}
-	}
 }

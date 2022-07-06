@@ -32,7 +32,13 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.espro.flink.consul.TestUtil;
+import com.espro.flink.consul.metric.ConsulMetricGroup;
+import com.espro.flink.consul.metric.ConsulMetricService;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
+import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -52,13 +58,18 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 	private ConsulSessionHolder sessionHolder1;
 	private ConsulSessionActivator sessionActivator2;
 	private ConsulSessionHolder sessionHolder2;
+	private ConsulMetricService consulMetricService;
 
 	@Before
 	public void setup() {
+		Configuration configuration = new Configuration();
+		MetricRegistry metricRegistry = TestUtil.createMetricRegistry(configuration);
+		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
+		this.consulMetricService = new ConsulMetricService(metricRegistry, consulMetricGroup);
 		client = new ConsulClient(String.format("localhost:%d", consul.getHttpPort()));
-        sessionActivator1 = new ConsulSessionActivator(() -> client, 10, null);
+        sessionActivator1 = new ConsulSessionActivator(() -> client, 10, consulMetricService);
 		sessionHolder1 = sessionActivator1.start();
-        sessionActivator2 = new ConsulSessionActivator(() -> client, 10, null);
+        sessionActivator2 = new ConsulSessionActivator(() -> client, 10, consulMetricService);
 		sessionHolder2 = sessionActivator2.start();
 	}
 
@@ -78,7 +89,7 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 
 		ConsulLeaderLatchListener listener = mock(ConsulLeaderLatchListener.class);
 
-        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime, null);
+        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime, consulMetricService);
 		latch.start();
 
         awaitLeaderElection();
@@ -98,9 +109,9 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 
 		LeaderRetrievalListener retrievalListener = mock(LeaderRetrievalListener.class);
 
-        ConsulLeaderLatch latch1 = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener1, waitTime, null);
-        ConsulLeaderLatch latch2 = new ConsulLeaderLatch(() -> client, executor, sessionHolder2, leaderKey, listener2, waitTime, null);
-        ConsulLeaderRetriever leaderResolver = new ConsulLeaderRetriever(() -> client, executor, leaderKey, retrievalListener, 1, null);
+        ConsulLeaderLatch latch1 = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener1, waitTime, consulMetricService);
+        ConsulLeaderLatch latch2 = new ConsulLeaderLatch(() -> client, executor, sessionHolder2, leaderKey, listener2, waitTime, consulMetricService);
+        ConsulLeaderRetriever leaderResolver = new ConsulLeaderRetriever(() -> client, executor, leaderKey, retrievalListener, 1, consulMetricService);
 
 		leaderResolver.start();
 		latch1.start();
@@ -132,7 +143,7 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 
 		ConsulLeaderLatchListener listener = mock(ConsulLeaderLatchListener.class);
 
-        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime, null);
+        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime, consulMetricService);
 		latch.start();
 
         awaitLeaderElection();
@@ -156,8 +167,8 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 		ConsulLeaderLatchListener listener = mock(ConsulLeaderLatchListener.class);
 		LeaderRetrievalListener retrievalListener = mock(LeaderRetrievalListener.class);
 
-        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime, null);
-        ConsulLeaderRetriever leaderResolver = new ConsulLeaderRetriever(() -> client, executor, leaderKey, retrievalListener, 1, null);
+        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime, consulMetricService);
+        ConsulLeaderRetriever leaderResolver = new ConsulLeaderRetriever(() -> client, executor, leaderKey, retrievalListener, 1, consulMetricService);
 
 		leaderResolver.start();
 		latch.start();

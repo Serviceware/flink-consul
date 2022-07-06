@@ -23,7 +23,6 @@ import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
-import com.espro.flink.consul.utils.TimeUtils;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
@@ -119,7 +118,7 @@ final class ConsulLeaderRetriever {
 			.build();
 		LocalDateTime startTime = LocalDateTime.now();
 		Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
-		setMetricValues(startTime);
+		this.consulMetricService.updateReadMetrics(startTime);
 		return leaderKeyValue.getValue();
 	}
 
@@ -136,13 +135,6 @@ final class ConsulLeaderRetriever {
             listener.notifyLeaderAddress(data.getAddress(), data.getSessionId());
 		} catch (Exception e) {
 			LOG.error("Listener failed on leader retrieved notification", e);
-		}
-	}
-
-	private void setMetricValues(LocalDateTime requestStartTime) {
-		long durationTime = TimeUtils.getDurationTime(requestStartTime);
-		if (consulMetricService != null) {
-			this.consulMetricService.setMetricValues(durationTime);
 		}
 	}
 }

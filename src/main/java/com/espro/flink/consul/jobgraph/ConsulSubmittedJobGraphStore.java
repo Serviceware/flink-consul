@@ -12,7 +12,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
-import com.espro.flink.consul.utils.TimeUtils;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServicesUtils;
@@ -82,7 +81,7 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
             LOG.debug("{} bytes will be written to Consul.", bytes.length);
             LocalDateTime startTime = LocalDateTime.now();
             Boolean response = client.get().setKVBinaryValue(path(jobGraph.getJobID()), bytes).getValue();
-            setMetricValues(startTime);
+            this.consulMetricService.updateWriteMetrics(startTime);
             success = response == null ? false : response;
         } finally {
             // Cleanup the state handle if it was not written to Consul
@@ -136,7 +135,7 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
     private RetrievableStateHandle<JobGraph> getStateHandle(JobID jobId) throws FlinkException {
         LocalDateTime startTime = LocalDateTime.now();
         GetBinaryValue value = client.get().getKVBinaryValue(path(jobId)).getValue();
-        setMetricValues(startTime);
+        this.consulMetricService.updateReadMetrics(startTime);
 		if (value != null) {
 			try {
                 return InstantiationUtil.deserializeObject(value.getValue(),
@@ -160,7 +159,7 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
         LocalDateTime startTime = LocalDateTime.now();
         // First remove state from Consul (Independent of errors when reading the state handler)
         client.get().deleteKVValue(path(jobId));
-        setMetricValues(startTime);
+        this.consulMetricService.updateWriteMetrics(startTime);
 
         if (stateHandle != null) {
             stateHandle.discardState();
@@ -173,7 +172,7 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 	public Collection<JobID> getJobIds() throws Exception {
         LocalDateTime startTime = LocalDateTime.now();
         List<String> value = client.get().getKVKeysOnly(jobgraphsPath).getValue();
-        setMetricValues(startTime);
+        this.consulMetricService.updateReadMetrics(startTime);
 		if (value != null) {
 			return value.stream()
 				.map(id -> id.split("/"))
@@ -186,11 +185,4 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 	private String path(JobID jobID) {
 		return jobgraphsPath + jobID.toString();
 	}
-
-    private void setMetricValues(LocalDateTime requestStartTime) {
-        long durationTime = TimeUtils.getDurationTime(requestStartTime);
-        if (consulMetricService != null) {
-            this.consulMetricService.setMetricValues(durationTime);
-        }
-    }
 }

@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
-import com.espro.flink.consul.utils.TimeUtils;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,38 +94,34 @@ public final class ConsulSessionActivator {
         newSession.setTtl(String.format("%ds", Math.max(10, sessionTtl.toMillis() / 1000)));
 		LocalDateTime startTime = LocalDateTime.now();
 		String value = clientProvider.get().sessionCreate(newSession, QueryParams.DEFAULT).getValue();
-		setMetricValues(startTime);
+		this.consulMetricService.updateSessionMetrics(startTime, false);
 		holder.setSessionId(value);
         Log.info("New consul session is created {}", holder.getSessionId());
 	}
 
 	private void renewConsulSession() {
+		LocalDateTime startTime = LocalDateTime.now();
 		try {
-			LocalDateTime startTime = LocalDateTime.now();
             clientProvider.get().renewSession(holder.getSessionId(), QueryParams.DEFAULT);
-			setMetricValues(startTime);
+			this.consulMetricService.updateSessionMetrics(startTime, false);
         } catch (OperationException e) {
+			this.consulMetricService.updateSessionMetrics(startTime, true);
             LOG.warn("Consul session renew failed, a new session is created.", e);
             createConsulSession();
         } catch (Exception e) {
+			this.consulMetricService.updateSessionMetrics(startTime, true);
 			LOG.error("Consul session renew failed", e);
 		}
 	}
 
 	private void destroyConsulSession() {
+		LocalDateTime startTime = LocalDateTime.now();
 		try {
-			LocalDateTime startTime = LocalDateTime.now();
             clientProvider.get().sessionDestroy(holder.getSessionId(), QueryParams.DEFAULT);
-			setMetricValues(startTime);
+			this.consulMetricService.updateSessionMetrics(startTime, false);
 		} catch (Exception e) {
+			this.consulMetricService.updateSessionMetrics(startTime, true);
 			LOG.error("Consul session destroy failed", e);
-		}
-	}
-
-	private void setMetricValues(LocalDateTime requestStartTime) {
-		long durationTime = TimeUtils.getDurationTime(requestStartTime);
-		if (consulMetricService != null) {
-			this.consulMetricService.setMetricValues(durationTime);
 		}
 	}
 }

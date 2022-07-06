@@ -5,7 +5,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
-import com.espro.flink.consul.utils.TimeUtils;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
@@ -61,7 +60,7 @@ final class ConsulCheckpointIDCounter implements CheckpointIDCounter {
     public long get() {
 		LocalDateTime startTime = LocalDateTime.now();
         GetValue gv = clientProvider.get().getKVValue(counterKey()).getValue();
-		setMetricValues(startTime);
+		this.consulMetricService.updateReadMetrics(startTime);
         if (gv == null) {
             index = 0;
             return 0;
@@ -81,7 +80,7 @@ final class ConsulCheckpointIDCounter implements CheckpointIDCounter {
 		params.setCas(index);
 		LocalDateTime startTime = LocalDateTime.now();
 		boolean result = clientProvider.get().setKVValue(counterKey(), String.valueOf(value), params).getValue();
-		setMetricValues(startTime);
+		this.consulMetricService.updateReadMetrics(startTime);
 		return result;
 	}
 
@@ -91,12 +90,5 @@ final class ConsulCheckpointIDCounter implements CheckpointIDCounter {
 
 	private String counterKey() {
 		return countersPath + jobID.toString();
-	}
-
-	private void setMetricValues(LocalDateTime requestStartTime) {
-		long durationTime = TimeUtils.getDurationTime(requestStartTime);
-		if (consulMetricService != null) {
-			this.consulMetricService.setMetricValues(durationTime);
-		}
 	}
 }
