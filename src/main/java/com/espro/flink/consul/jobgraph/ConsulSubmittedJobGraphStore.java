@@ -5,9 +5,6 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -23,13 +20,11 @@ import org.apache.flink.runtime.state.RetrievableStateHandle;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.function.ThrowingRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.kv.model.GetBinaryValue;
-
 
 /**
  * Stores the state of the job graph to the configured HA storage directory and only a pointer (RetrievableStateHandle) of the state to
@@ -97,41 +92,6 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
         return getStateHandle(jobId).retrieveState();
     }
 
-    @Override
-    public CompletableFuture<Void> localCleanupAsync(JobID jobId, Executor executor) {
-        return runAsyncWithLockAssertRunning(
-                () -> {
-                    LOG.debug("Releasing job graph {}.", jobId);
-                    removeJobGraph(jobId);
-                    LOG.info("Released job graph {} .", jobId);
-                },
-                executor);
-    }
-
-    @Override
-    public CompletableFuture<Void> globalCleanupAsync(JobID jobId, Executor executor) {
-        return runAsyncWithLockAssertRunning(
-                () -> {
-                    LOG.debug("Releasing job graph {}.", jobId);
-                    removeJobGraph(jobId);
-                    LOG.info("Released job graph {} .", jobId);
-                },
-                executor);
-    }
-
-    private CompletableFuture<Void> runAsyncWithLockAssertRunning(
-            ThrowingRunnable<Exception> runnable, Executor executor) {
-        return CompletableFuture.runAsync(
-                () -> {
-                        try {
-                            runnable.run();
-                        } catch (Exception e) {
-                            throw new CompletionException(e);
-                        }
-                },
-                executor);
-    }
-
     private RetrievableStateHandle<JobGraph> getStateHandle(JobID jobId) throws FlinkException {
         LocalDateTime startTime = LocalDateTime.now();
         GetBinaryValue value = client.get().getKVBinaryValue(path(jobId)).getValue();
@@ -185,4 +145,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 	private String path(JobID jobID) {
 		return jobgraphsPath + jobID.toString();
 	}
+
+    @Override
+    public void releaseJobGraph(JobID jobId) throws Exception {
+        // can be ignored, because no lock is held
+    }
 }

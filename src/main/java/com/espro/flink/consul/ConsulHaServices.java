@@ -36,7 +36,7 @@ import org.apache.flink.runtime.blob.BlobStore;
 import org.apache.flink.runtime.blob.BlobStoreService;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
-import org.apache.flink.runtime.highavailability.JobResultStore;
+import org.apache.flink.runtime.highavailability.RunningJobsRegistry;
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
@@ -52,7 +52,6 @@ import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.MetricRegistryConfiguration;
 import org.apache.flink.runtime.metrics.MetricRegistryImpl;
 import org.apache.flink.runtime.metrics.ReporterSetup;
-import org.apache.flink.runtime.rpc.RpcSystem;
 
 /**
  * An implementation of {@link HighAvailabilityServices} using Hashicorp Consul.
@@ -86,7 +85,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	/**
 	 * The Consul based running jobs registry
 	 */
-	private final JobResultStore runningJobsRegistry;
+	private final RunningJobsRegistry runningJobsRegistry;
 
 	/**
 	 * Store for arbitrary blobs
@@ -182,7 +181,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	}
 
 	@Override
-	public JobResultStore getJobResultStore() throws Exception {
+	public RunningJobsRegistry getRunningJobsRegistry() throws Exception {
 		return runningJobsRegistry;
 	}
 
@@ -224,12 +223,9 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	 * This method is an entry point to register a metric to the Flink metric by creating MetricRegistry.
 	 * */
 	private MetricRegistry createMetricRegistry(Configuration configuration) {
-		RpcSystem rpcSystem = RpcSystem.load(configuration);
 		PluginManager pluginManager =
 				PluginUtils.createPluginManagerFromRootFolder(configuration);
-		return new MetricRegistryImpl(
-				MetricRegistryConfiguration.fromConfiguration(
-						configuration, rpcSystem.getMaximumMessageSizeInBytes(configuration)),
+		return new MetricRegistryImpl(MetricRegistryConfiguration.fromConfiguration(configuration),
 				ReporterSetup.fromConfiguration(configuration, pluginManager));
 	}
 }

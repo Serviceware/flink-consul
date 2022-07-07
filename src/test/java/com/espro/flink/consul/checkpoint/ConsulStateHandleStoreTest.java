@@ -26,8 +26,7 @@ import org.apache.flink.runtime.persistence.RetrievableStateStorageHelper;
 import org.apache.flink.runtime.persistence.filesystem.FileSystemStateStorageHelper;
 import org.apache.flink.runtime.state.RetrievableStateHandle;
 import org.apache.flink.runtime.state.SharedStateRegistry;
-import org.apache.flink.runtime.state.SharedStateRegistryImpl;
-import org.apache.flink.shaded.curator5.org.apache.curator.shaded.com.google.common.io.Files;
+import org.apache.flink.shaded.guava18.com.google.common.io.Files;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -59,7 +58,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testgetAndLock() throws Exception {
         // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
+        SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
@@ -78,7 +77,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testGetAllAndLock() throws Exception {
         // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
+        SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
@@ -116,7 +115,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testGetAllHandles() throws Exception {
         // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
+        SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
@@ -152,7 +151,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testReleaseAndTryRemove() throws Exception {
         // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
+        SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
@@ -174,7 +173,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testReleaseAndTryRemoveAll() throws Exception {
         // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
+        SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
@@ -195,7 +194,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testExists() throws Exception {
         // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
+        SharedStateRegistry sharedStateRegistry = new SharedStateRegistry();
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore

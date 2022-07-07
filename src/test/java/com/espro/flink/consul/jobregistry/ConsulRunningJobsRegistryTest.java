@@ -8,8 +8,7 @@ import com.espro.flink.consul.metric.ConsulMetricService;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
-import org.apache.flink.runtime.highavailability.JobResultEntry;
-import org.apache.flink.runtime.jobmaster.JobResult;
+import org.apache.flink.runtime.highavailability.RunningJobsRegistry;
 import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,9 +16,6 @@ import org.junit.Test;
 import com.ecwid.consul.v1.ConsulClient;
 import com.espro.flink.consul.AbstractConsulTest;
 import com.espro.flink.consul.ConsulSessionActivator;
-
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class ConsulRunningJobsRegistryTest extends AbstractConsulTest {
 
@@ -43,8 +39,9 @@ public class ConsulRunningJobsRegistryTest extends AbstractConsulTest {
         ConsulRunningJobsRegistry registry = new ConsulRunningJobsRegistry(() -> client, sessionActivator.getHolder(), jobRegistryPath, consulMetricService);
 
 		JobID jobID = JobID.generate();
-		registry.createDirtyResult(createJobResult(jobID));
-		assertEquals(true, registry.hasDirtyJobResultEntry(jobID));
+
+		registry.setJobRunning(jobID);
+		assertEquals(RunningJobsRegistry.JobSchedulingStatus.RUNNING, registry.getJobSchedulingStatus(jobID));
 	}
 
 	@Test
@@ -52,8 +49,9 @@ public class ConsulRunningJobsRegistryTest extends AbstractConsulTest {
         ConsulRunningJobsRegistry registry = new ConsulRunningJobsRegistry(() -> client, sessionActivator.getHolder(), jobRegistryPath, consulMetricService);
 
 		JobID jobID = JobID.generate();
-		registry.markResultAsClean(jobID);
-		assertEquals(true, registry.hasCleanJobResultEntry(jobID));
+
+		registry.setJobFinished(jobID);
+		assertEquals(RunningJobsRegistry.JobSchedulingStatus.DONE, registry.getJobSchedulingStatus(jobID));
 	}
 
 	@Test
@@ -62,41 +60,12 @@ public class ConsulRunningJobsRegistryTest extends AbstractConsulTest {
 
 		JobID jobID = JobID.generate();
 
-		registry.createDirtyResult(createJobResult(jobID));
-		assertEquals(true, registry.hasDirtyJobResultEntry(jobID));
+		assertEquals(RunningJobsRegistry.JobSchedulingStatus.PENDING, registry.getJobSchedulingStatus(jobID));
 
-		registry.markResultAsClean(jobID);
-		assertEquals(true, registry.hasCleanJobResultEntry(jobID));
+		registry.setJobRunning(jobID);
+		assertEquals(RunningJobsRegistry.JobSchedulingStatus.RUNNING, registry.getJobSchedulingStatus(jobID));
 
-		JobID jobID2 = JobID.generate();
-		registry.markResultAsClean(jobID2);
-		assertEquals(true, registry.hasCleanJobResultEntry(jobID2));
-		assertEquals(true, registry.hasCleanJobResultEntry(jobID));
-	}
-
-	@Test
-	public void testGetDirtyJobs() throws Exception {
-		ConsulRunningJobsRegistry registry = new ConsulRunningJobsRegistry(() -> client, sessionActivator.getHolder(), jobRegistryPath, consulMetricService);
-
-		JobID jobID = JobID.generate();
-		registry.createDirtyResult(createJobResult(jobID));
-
-		JobID jobID2 = JobID.generate();
-		registry.createDirtyResult(createJobResult(jobID2));
-
-		JobID jobID3 = JobID.generate();
-		registry.markResultAsClean(jobID3);
-
-		Set<JobResult> dirtyResults = registry.getDirtyResults();
-		Set<String> jobIds = dirtyResults.stream().map(jobResult -> jobResult.getJobId().toString()).collect(Collectors.toSet());
-
-		assertEquals(2, dirtyResults.size());
-		assertEquals(true, jobIds.contains(jobID.toString()));
-		assertEquals(true, jobIds.contains(jobID2.toString()));
-	}
-
-	private JobResultEntry createJobResult(JobID jobID) {
-		JobResult jobResult = new JobResult.Builder().jobId(jobID).netRuntime(1).build();
-		return new JobResultEntry(jobResult);
+		registry.clearJob(jobID);
+		assertEquals(RunningJobsRegistry.JobSchedulingStatus.PENDING, registry.getJobSchedulingStatus(jobID));
 	}
 }

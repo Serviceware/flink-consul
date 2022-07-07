@@ -12,13 +12,9 @@ import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
 import org.apache.flink.runtime.checkpoint.DefaultCompletedCheckpointStore;
-import org.apache.flink.runtime.checkpoint.DefaultCompletedCheckpointStoreUtils;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServicesUtils;
-import org.apache.flink.runtime.jobgraph.RestoreMode;
 import org.apache.flink.runtime.persistence.RetrievableStateStorageHelper;
 import org.apache.flink.runtime.persistence.filesystem.FileSystemStateStorageHelper;
-import org.apache.flink.runtime.state.SharedStateRegistry;
-import org.apache.flink.runtime.state.SharedStateRegistryFactory;
 import org.apache.flink.util.Preconditions;
 
 import com.ecwid.consul.v1.ConsulClient;
@@ -38,7 +34,8 @@ public final class ConsulCheckpointRecoveryFactory implements CheckpointRecovery
 		this.consulMetricService = consulMetricService;
 	}
 
-	private CompletedCheckpointStore createCheckpointStore(JobID jobId, int maxNumberOfCheckpointsToRetain, SharedStateRegistryFactory sharedStateRegistryFactory, Executor ioExecutor, RestoreMode restoreMode) throws Exception {
+	@Override
+	public CompletedCheckpointStore createCheckpointStore(JobID jobId, int maxNumberOfCheckpointsToRetain, ClassLoader userClassLoader) throws Exception {
         RetrievableStateStorageHelper<CompletedCheckpoint> stateStorage = new FileSystemStateStorageHelper<>(
                 HighAvailabilityServicesUtils.getClusterHighAvailableStoragePath(configuration), "completedCheckpoint");
 
@@ -46,17 +43,8 @@ public final class ConsulCheckpointRecoveryFactory implements CheckpointRecovery
                 checkpointsPath());
         ConsulCheckpointStoreUtil consulCheckpointStoreUtil = new ConsulCheckpointStoreUtil(checkpointsPath(), jobId);
 
-		Collection<CompletedCheckpoint> completedCheckpoints = DefaultCompletedCheckpointStoreUtils.retrieveCompletedCheckpoints(
-				consulStateHandleStore, consulCheckpointStoreUtil);
-		SharedStateRegistry sharedStateRegistry = sharedStateRegistryFactory.create(ioExecutor, completedCheckpoints, restoreMode);
-
-		return new DefaultCompletedCheckpointStore<>(maxNumberOfCheckpointsToRetain, consulStateHandleStore, consulCheckpointStoreUtil, completedCheckpoints, sharedStateRegistry,
+        return new DefaultCompletedCheckpointStore<>(maxNumberOfCheckpointsToRetain, consulStateHandleStore, consulCheckpointStoreUtil,
                 executor);
-	}
-
-	@Override
-	public CompletedCheckpointStore createRecoveredCompletedCheckpointStore(JobID jobId, int maxNumberOfCheckpointsToRetain, SharedStateRegistryFactory sharedStateRegistryFactory, Executor ioExecutor, RestoreMode restoreMode) throws Exception {
-    	return createCheckpointStore(jobId, maxNumberOfCheckpointsToRetain, sharedStateRegistryFactory, ioExecutor, restoreMode);
 	}
 
 	@Override
