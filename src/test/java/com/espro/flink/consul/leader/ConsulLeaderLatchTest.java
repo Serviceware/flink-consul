@@ -65,7 +65,7 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 		Configuration configuration = new Configuration();
 		MetricRegistry metricRegistry = TestUtil.createMetricRegistry(configuration);
 		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
-		this.consulMetricService = new ConsulMetricService(metricRegistry, consulMetricGroup);
+		this.consulMetricService = new ConsulMetricService(consulMetricGroup);
 		client = new ConsulClient(String.format("localhost:%d", consul.getHttpPort()));
         sessionActivator1 = new ConsulSessionActivator(() -> client, 10, consulMetricService);
 		sessionHolder1 = sessionActivator1.start();

@@ -103,9 +103,8 @@ public class ConsulHaServices implements HighAvailabilityServices {
 
 		MetricRegistry metricRegistry = createMetricRegistry(configuration);
 		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
-		this.consulMetricService = new ConsulMetricService(metricRegistry, consulMetricGroup);
+		this.consulMetricService = new ConsulMetricService(consulMetricGroup);
 
-		this.consulMetricService.registerDefaultMetrics();
         this.clientProvider = () -> ConsulClientFactory.createConsulClient(configuration);
 		this.executor = Executors.newCachedThreadPool();
 		this.configuration = checkNotNull(configuration);
@@ -221,6 +220,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 
 	/**
 	 * This method is an entry point to register a metric to the Flink metric by creating MetricRegistry.
+	 * @param configuration The runtime configuration.
 	 * */
 	private MetricRegistry createMetricRegistry(Configuration configuration) {
 		PluginManager pluginManager =

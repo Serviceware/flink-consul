@@ -2,15 +2,10 @@ package com.espro.flink.consul.metric;
 
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Histogram;
-import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.SimpleCounter;
-import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.DescriptiveStatisticsHistogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
-import java.time.LocalDateTime;
 
 /**
  * This class registers metrics to Flink metrics and then calculates and publishes them.
@@ -20,7 +15,6 @@ public class ConsulMetricService{
 
     private static final int HISTORY_SIZE = 100;
 
-    private final MetricRegistry metricRegistry;
     private final ConsulMetricGroup consulMetricGroup;
     private final Counter readRequest;
     private final Counter writeRequest;
@@ -30,8 +24,7 @@ public class ConsulMetricService{
     private final Counter sessionError;
     private final Histogram sessionDuration;
 
-    public ConsulMetricService(MetricRegistry metricRegistry, ConsulMetricGroup consulMetricGroup) {
-        this.metricRegistry = metricRegistry;
+    public ConsulMetricService(ConsulMetricGroup consulMetricGroup) {
         this.consulMetricGroup = consulMetricGroup;
         this.readRequest = new SimpleCounter();
         this.writeRequest = new SimpleCounter();
@@ -40,60 +33,38 @@ public class ConsulMetricService{
         this.readDuration = new DescriptiveStatisticsHistogram(HISTORY_SIZE);
         this.writeDuration = new DescriptiveStatisticsHistogram(HISTORY_SIZE);
         this.sessionDuration = new DescriptiveStatisticsHistogram(HISTORY_SIZE);
+        registerDefaultMetrics();
     }
 
     /**
-     * Register the default Consul metrics to the Flink metric entry point
+     * Notifies about read operation on Consul's key/value store and how long it has taken
+     * @param duration duration of read on Consul's key/value store
      */
-    public void registerDefaultMetrics() {
-        LOG.info("Start registering default consul metrics.");
-        registerMetrics(readRequest, "consul.read");
-        registerMetrics(writeRequest, "consul.write");
-        registerMetrics(readDuration, "consul.read.duration");
-        registerMetrics(writeDuration, "consul.write.duration");
-        registerMetrics(session, "consul.session");
-        registerMetrics(sessionError, "consul.session.error");
-        registerMetrics(sessionDuration, "consul.session.duration");
-    }
-
-    /**
-     * Register the Consul metrics to the Flink metric entry point
-     * @param metric metric(e.g Counter, Histogram, etc)
-     * @param metricName metric name
-     */
-    public void registerMetrics(Metric metric, String metricName) {
-        this.metricRegistry.register(metric, metricName, consulMetricGroup);
-    }
-
-    /**
-     * Update the consul read metrics
-     * @param startTime start time of request
-     */
-    public void updateReadMetrics(LocalDateTime startTime) {
+    public void updateReadMetrics(long duration) {
         LOG.debug("Update read metrics.");
         synchronized (readRequest) {
             this.readRequest.inc();
-            this.readDuration.update(calculateDurationTime(startTime));
+            this.readDuration.update(duration);
         }
     }
 
     /**
-     * Update the consul write metrics
-     * @param startTime start time of request
+     * Notifies about read operation on Consul's key/value store and how long it has taken
+     * @param duration duration of write on Consul's key/value store
      */
-    public void updateWriteMetrics(LocalDateTime startTime) {
+    public void updateWriteMetrics(long duration) {
         LOG.debug("Update write metrics.");
         synchronized (writeRequest) {
             this.writeRequest.inc();
-            this.writeDuration.update(calculateDurationTime(startTime));
+            this.writeDuration.update(duration);
         }
     }
 
     /**
      * Update the consul session metrics
-     * @param startTime start time of request
+     * @param duration duration of session on Consul's key/value store
      */
-    public void updateSessionMetrics(LocalDateTime startTime, boolean isError) {
+    public void updateSessionMetrics(long duration, boolean isError) {
         LOG.debug("Update session metrics.");
         synchronized (sessionDuration) {
             if (isError) {
@@ -101,13 +72,21 @@ public class ConsulMetricService{
             } else {
                 this.session.inc();
             }
-            this.sessionDuration.update(calculateDurationTime(startTime));
+            this.sessionDuration.update(duration);
         }
     }
 
-    private long calculateDurationTime(LocalDateTime startTime) {
-        LocalDateTime currentTime = LocalDateTime.now();
-        Duration duration = Duration.between(startTime, currentTime);
-        return duration.toMillis() / 1000;
+    /**
+     * Register the default Consul metrics to the Flink metric entry point
+     */
+    private void registerDefaultMetrics() {
+        LOG.info("Start registering default consul metrics.");
+        consulMetricGroup.counter("consul.read", readRequest);
+        consulMetricGroup.counter("consul.write", writeRequest);
+        consulMetricGroup.histogram("consul.read.duration", readDuration);
+        consulMetricGroup.histogram("consul.write.duration", writeDuration);
+        consulMetricGroup.counter("consul.session", session);
+        consulMetricGroup.counter("consul.session.error", sessionError);
+        consulMetricGroup.histogram("consul.session.duration", sessionDuration);
     }
 }

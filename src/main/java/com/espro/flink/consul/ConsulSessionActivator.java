@@ -1,13 +1,13 @@
 package com.espro.flink.consul;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,35 +92,35 @@ public final class ConsulSessionActivator {
 		NewSession newSession = new NewSession();
 		newSession.setName("flink");
         newSession.setTtl(String.format("%ds", Math.max(10, sessionTtl.toMillis() / 1000)));
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
 		String value = clientProvider.get().sessionCreate(newSession, QueryParams.DEFAULT).getValue();
-		this.consulMetricService.updateSessionMetrics(startTime, false);
+		this.consulMetricService.updateSessionMetrics(started.elapsed(TimeUnit.MILLISECONDS), false);
 		holder.setSessionId(value);
         Log.info("New consul session is created {}", holder.getSessionId());
 	}
 
 	private void renewConsulSession() {
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
 		try {
             clientProvider.get().renewSession(holder.getSessionId(), QueryParams.DEFAULT);
-			this.consulMetricService.updateSessionMetrics(startTime, false);
+			this.consulMetricService.updateSessionMetrics(started.elapsed(TimeUnit.MILLISECONDS), false);
         } catch (OperationException e) {
-			this.consulMetricService.updateSessionMetrics(startTime, true);
+			this.consulMetricService.updateSessionMetrics(started.elapsed(TimeUnit.MILLISECONDS), true);
             LOG.warn("Consul session renew failed, a new session is created.", e);
             createConsulSession();
         } catch (Exception e) {
-			this.consulMetricService.updateSessionMetrics(startTime, true);
+			this.consulMetricService.updateSessionMetrics(started.elapsed(TimeUnit.MILLISECONDS), true);
 			LOG.error("Consul session renew failed", e);
 		}
 	}
 
 	private void destroyConsulSession() {
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
 		try {
             clientProvider.get().sessionDestroy(holder.getSessionId(), QueryParams.DEFAULT);
-			this.consulMetricService.updateSessionMetrics(startTime, false);
+			this.consulMetricService.updateSessionMetrics(started.elapsed(TimeUnit.MILLISECONDS), false);
 		} catch (Exception e) {
-			this.consulMetricService.updateSessionMetrics(startTime, true);
+			this.consulMetricService.updateSessionMetrics(started.elapsed(TimeUnit.MILLISECONDS), true);
 			LOG.error("Consul session destroy failed", e);
 		}
 	}

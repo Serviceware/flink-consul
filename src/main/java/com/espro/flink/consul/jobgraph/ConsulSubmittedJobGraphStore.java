@@ -1,10 +1,10 @@
 package com.espro.flink.consul.jobgraph;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -17,6 +17,7 @@ import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.persistence.RetrievableStateStorageHelper;
 import org.apache.flink.runtime.persistence.filesystem.FileSystemStateStorageHelper;
 import org.apache.flink.runtime.state.RetrievableStateHandle;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
@@ -74,9 +75,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
             // smaller than the state itself.
             byte[] bytes = InstantiationUtil.serializeObject(stateHandle);
             LOG.debug("{} bytes will be written to Consul.", bytes.length);
-            LocalDateTime startTime = LocalDateTime.now();
+            Stopwatch started = Stopwatch.createStarted();
             Boolean response = client.get().setKVBinaryValue(path(jobGraph.getJobID()), bytes).getValue();
-            this.consulMetricService.updateWriteMetrics(startTime);
+            this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
             success = response == null ? false : response;
         } finally {
             // Cleanup the state handle if it was not written to Consul
@@ -93,9 +94,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
     }
 
     private RetrievableStateHandle<JobGraph> getStateHandle(JobID jobId) throws FlinkException {
-        LocalDateTime startTime = LocalDateTime.now();
+        Stopwatch started = Stopwatch.createStarted();
         GetBinaryValue value = client.get().getKVBinaryValue(path(jobId)).getValue();
-        this.consulMetricService.updateReadMetrics(startTime);
+        this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		if (value != null) {
 			try {
                 return InstantiationUtil.deserializeObject(value.getValue(),
@@ -116,10 +117,10 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
             LOG.warn("Could not retrieve the state handle from Consul {}.", path(jobId), e);
         }
 
-        LocalDateTime startTime = LocalDateTime.now();
+        Stopwatch started = Stopwatch.createStarted();
         // First remove state from Consul (Independent of errors when reading the state handler)
         client.get().deleteKVValue(path(jobId));
-        this.consulMetricService.updateWriteMetrics(startTime);
+        this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 
         if (stateHandle != null) {
             stateHandle.discardState();
@@ -130,9 +131,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 
 	@Override
 	public Collection<JobID> getJobIds() throws Exception {
-        LocalDateTime startTime = LocalDateTime.now();
+        Stopwatch started = Stopwatch.createStarted();
         List<String> value = client.get().getKVKeysOnly(jobgraphsPath).getValue();
-        this.consulMetricService.updateReadMetrics(startTime);
+        this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		if (value != null) {
 			return value.stream()
 				.map(id -> id.split("/"))

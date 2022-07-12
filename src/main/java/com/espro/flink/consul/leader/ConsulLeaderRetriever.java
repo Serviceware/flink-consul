@@ -18,12 +18,13 @@
 
 package com.espro.flink.consul.leader;
 
-import java.time.LocalDateTime;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,9 +117,9 @@ final class ConsulLeaderRetriever {
 			.setIndex(leaderKeyIndex)
 			.setWaitTime(waitTime)
 			.build();
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
 		Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
-		this.consulMetricService.updateReadMetrics(startTime);
+		this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		return leaderKeyValue.getValue();
 	}
 

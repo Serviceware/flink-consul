@@ -47,7 +47,7 @@ public class ConsulSubmittedJobGraphStoreTest extends AbstractConsulTest {
         configuration.setString(HighAvailabilityOptions.HA_STORAGE_PATH, tmpFolder.newFolder().getAbsolutePath());
 		MetricRegistry metricRegistry = TestUtil.createMetricRegistry(configuration);
 		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
-        this.consulMetricService = new ConsulMetricService(metricRegistry, consulMetricGroup);
+        this.consulMetricService = new ConsulMetricService(consulMetricGroup);
 	}
 
 	@Test

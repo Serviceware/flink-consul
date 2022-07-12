@@ -1,12 +1,13 @@
 package com.espro.flink.consul.checkpoint;
 
-import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.Preconditions;
 
 import com.ecwid.consul.v1.ConsulClient;
@@ -55,9 +56,9 @@ final class ConsulCheckpointIDCounter implements CheckpointIDCounter {
 
     @Override
     public long get() {
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
         GetValue gv = clientProvider.get().getKVValue(counterKey()).getValue();
-		this.consulMetricService.updateReadMetrics(startTime);
+		this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
         if (gv == null) {
             index = 0;
             return 0;
@@ -75,9 +76,9 @@ final class ConsulCheckpointIDCounter implements CheckpointIDCounter {
 	private boolean writeCounter(long value) {
 		PutParams params = new PutParams();
 		params.setCas(index);
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
 		boolean result = clientProvider.get().setKVValue(counterKey(), String.valueOf(value), params).getValue();
-		this.consulMetricService.updateReadMetrics(startTime);
+		this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		return result;
 	}
 

@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import com.espro.flink.consul.metric.ConsulMetricService;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,9 +151,9 @@ final class ConsulLeaderLatch {
 			.setIndex(leaderKeyIndex)
                 .setWaitTime(waitTimeInSeconds)
 			.build();
-		LocalDateTime startTime = LocalDateTime.now();
+		Stopwatch started = Stopwatch.createStarted();
 		Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
-		this.consulMetricService.updateReadMetrics(startTime);
+		this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		return leaderKeyValue.getValue();
 	}
 
@@ -161,9 +162,9 @@ final class ConsulLeaderLatch {
 		putParams.setAcquireSession(sessionHolder.getSessionId());
 		try {
             ConsulLeaderData data = new ConsulLeaderData(nodeAddress, flinkSessionId);
-			LocalDateTime startTime = LocalDateTime.now();
+			Stopwatch started = Stopwatch.createStarted();
             Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
-			this.consulMetricService.updateWriteMetrics(startTime);
+			this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 			return response != null ? response : false;
 		} catch (OperationException ex) {
             LOG.error("Error while writing leader key for {} with session id {} to Consul.", nodeAddress, flinkSessionId);
@@ -175,9 +176,9 @@ final class ConsulLeaderLatch {
 		PutParams putParams = new PutParams();
 		putParams.setReleaseSession(sessionHolder.getSessionId());
 		try {
-			LocalDateTime startTime = LocalDateTime.now();
+			Stopwatch started = Stopwatch.createStarted();
 			Boolean result = clientProvider.get().setKVBinaryValue(leaderKey, new byte[0], putParams).getValue();
-			this.consulMetricService.updateWriteMetrics(startTime);
+			this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 			return result;
 		} catch (OperationException ex) {
             LOG.error("Error while releasing leader key for session {}.", sessionHolder.getSessionId());

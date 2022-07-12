@@ -3,14 +3,12 @@ package com.espro.flink.consul.metric;
 import org.apache.flink.metrics.CharacterFilter;
 import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
-import org.apache.flink.runtime.metrics.groups.ComponentMetricGroup;
-
-import java.util.Collections;
+import org.apache.flink.runtime.metrics.groups.AbstractMetricGroup;
 
 /**
  * This class provides the Flink metric group to publish consul metrics.
  */
-public class ConsulMetricGroup extends ComponentMetricGroup<ConsulMetricGroup> {
+public class ConsulMetricGroup extends AbstractMetricGroup<ConsulMetricGroup> {
 
     public ConsulMetricGroup(MetricRegistry registry, String hostname) {
         super(registry, getScope(registry, hostname), null);
@@ -24,11 +22,6 @@ public class ConsulMetricGroup extends ComponentMetricGroup<ConsulMetricGroup> {
     @Override
     protected QueryScopeInfo createQueryServiceMetricInfo(CharacterFilter filter) {
         return new QueryScopeInfo.JobManagerQueryScopeInfo();
-    }
-
-    @Override
-    protected Iterable<? extends ComponentMetricGroup<ConsulMetricGroup>> subComponents() {
-        return Collections.emptyList();
     }
 
     private static String[] getScope(MetricRegistry registry, String hostname) {

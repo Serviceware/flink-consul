@@ -31,7 +31,7 @@ public class ConsulRunningJobsRegistryTest extends AbstractConsulTest {
 		Configuration configuration = new Configuration();
 		MetricRegistry metricRegistry = TestUtil.createMetricRegistry(configuration);
 		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
-		this.consulMetricService = new ConsulMetricService(metricRegistry, consulMetricGroup);
+		this.consulMetricService = new ConsulMetricService(consulMetricGroup);
 	}
 
 	@Test
