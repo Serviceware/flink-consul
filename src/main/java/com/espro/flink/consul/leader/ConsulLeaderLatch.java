@@ -18,11 +18,14 @@
 
 package com.espro.flink.consul.leader;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import com.espro.flink.consul.metric.ConsulMetricService;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +50,8 @@ final class ConsulLeaderLatch {
 
 	private final String leaderKey;
 
+	private final ConsulMetricService consulMetricService;
+
 	/**
 	 * SessionID
 	 */
@@ -68,19 +73,22 @@ final class ConsulLeaderLatch {
      * @param leaderKey key in Consul KV store
      * @param nodeAddress leadership changes are reported to this contender
      * @param waitTime Consul blocking read timeout (in seconds)
+	 * @param consulMetricService provides a Consul metric service
      */
     public ConsulLeaderLatch(Supplier<ConsulClient> clientProvider,
 							 Executor executor,
 							 ConsulSessionHolder sessionHolder,
 							 String leaderKey,
 							 ConsulLeaderLatchListener listener,
-							 int waitTime) {
+							 int waitTime,
+							 ConsulMetricService consulMetricService) {
 		this.clientProvider = Preconditions.checkNotNull(clientProvider, "client");
 		this.executor = Preconditions.checkNotNull(executor, "executor");
 		this.sessionHolder = Preconditions.checkNotNull(sessionHolder, "sessionHolder");
 		this.leaderKey = Preconditions.checkNotNull(leaderKey, "leaderKey");
 		this.listener = Preconditions.checkNotNull(listener, "listener");
         this.waitTimeInSeconds = waitTime;
+        this.consulMetricService = consulMetricService;
 	}
 
 	public void start() {
@@ -143,7 +151,9 @@ final class ConsulLeaderLatch {
 			.setIndex(leaderKeyIndex)
                 .setWaitTime(waitTimeInSeconds)
 			.build();
-        Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
+		Stopwatch started = Stopwatch.createStarted();
+		Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
+		this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		return leaderKeyValue.getValue();
 	}
 
@@ -152,8 +162,10 @@ final class ConsulLeaderLatch {
 		putParams.setAcquireSession(sessionHolder.getSessionId());
 		try {
             ConsulLeaderData data = new ConsulLeaderData(nodeAddress, flinkSessionId);
+			Stopwatch started = Stopwatch.createStarted();
             Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
-            return response != null ? response : false;
+			this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
+			return response != null ? response : false;
 		} catch (OperationException ex) {
             LOG.error("Error while writing leader key for {} with session id {} to Consul.", nodeAddress, flinkSessionId);
 			return false;
@@ -164,7 +176,10 @@ final class ConsulLeaderLatch {
 		PutParams putParams = new PutParams();
 		putParams.setReleaseSession(sessionHolder.getSessionId());
 		try {
-            return clientProvider.get().setKVBinaryValue(leaderKey, new byte[0], putParams).getValue();
+			Stopwatch started = Stopwatch.createStarted();
+			Boolean result = clientProvider.get().setKVBinaryValue(leaderKey, new byte[0], putParams).getValue();
+			this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
+			return result;
 		} catch (OperationException ex) {
             LOG.error("Error while releasing leader key for session {}.", sessionHolder.getSessionId());
 			return false;
@@ -208,5 +223,4 @@ final class ConsulLeaderLatch {
             writeLeaderKey(leaderAddress);
         }
     }
-
 }

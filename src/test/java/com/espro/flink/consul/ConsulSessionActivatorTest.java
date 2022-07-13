@@ -7,6 +7,11 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import com.espro.flink.consul.metric.ConsulMetricGroup;
+import com.espro.flink.consul.metric.ConsulMetricService;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerOptions;
+import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -17,16 +22,21 @@ import com.ecwid.consul.v1.session.model.NewSession;
 public class ConsulSessionActivatorTest extends AbstractConsulTest {
 
 	private ConsulClient client;
+	private ConsulMetricService consulMetricService;
 
 	@Before
 	public void setup() {
 		client = new ConsulClient("localhost", consul.getHttpPort());
+		Configuration configuration = new Configuration();
+		MetricRegistry metricRegistry = TestUtil.createMetricRegistry(configuration);
+		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
+		this.consulMetricService = new ConsulMetricService(consulMetricGroup);
 	}
 
 	@Test
 	public void testSessionLifecycle() throws Exception {
 		ConsulClient spiedClient = spy(client);
-        ConsulSessionActivator cse = new ConsulSessionActivator(() -> spiedClient, 10);
+        ConsulSessionActivator cse = new ConsulSessionActivator(() -> spiedClient, 10, consulMetricService);
 		ConsulSessionHolder holder = cse.start();
 		Thread.sleep(1000);
 

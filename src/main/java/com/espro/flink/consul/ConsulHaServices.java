@@ -25,13 +25,18 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
+import com.espro.flink.consul.metric.ConsulMetricGroup;
+import com.espro.flink.consul.metric.ConsulMetricService;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerOptions;
+import org.apache.flink.core.plugin.PluginManager;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.blob.BlobStore;
 import org.apache.flink.runtime.blob.BlobStoreService;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
-import org.apache.flink.runtime.highavailability.JobResultStore;
+import org.apache.flink.runtime.highavailability.RunningJobsRegistry;
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
@@ -43,11 +48,18 @@ import com.espro.flink.consul.jobgraph.ConsulSubmittedJobGraphStore;
 import com.espro.flink.consul.jobregistry.ConsulRunningJobsRegistry;
 import com.espro.flink.consul.leader.ConsulLeaderElectionService;
 import com.espro.flink.consul.leader.ConsulLeaderRetrievalService;
+import org.apache.flink.runtime.metrics.MetricRegistry;
+import org.apache.flink.runtime.metrics.MetricRegistryConfiguration;
+import org.apache.flink.runtime.metrics.MetricRegistryImpl;
+import org.apache.flink.runtime.metrics.ReporterSetup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of {@link HighAvailabilityServices} using Hashicorp Consul.
  */
 public class ConsulHaServices implements HighAvailabilityServices {
+	private static final Logger LOG = LoggerFactory.getLogger(ConsulHaServices.class);
 
 	private static final String RESOURCE_MANAGER_LEADER_PATH = "resource_manager_lock";
 
@@ -76,7 +88,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	/**
 	 * The Consul based running jobs registry
 	 */
-	private final JobResultStore runningJobsRegistry;
+	private final RunningJobsRegistry runningJobsRegistry;
 
 	/**
 	 * Store for arbitrary blobs
@@ -86,27 +98,34 @@ public class ConsulHaServices implements HighAvailabilityServices {
 
 	private final ConsulSessionActivator consulSessionActivator;
 
+	private final ConsulMetricService consulMetricService;
+
     public ConsulHaServices(Executor executor,
 							Configuration configuration,
 							BlobStoreService blobStoreService) {
+		LOG.info("ConsulHaServices constructor");
+		MetricRegistry metricRegistry = createMetricRegistry(configuration);
+		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
+		this.consulMetricService = new ConsulMetricService(consulMetricGroup);
+
         this.clientProvider = () -> ConsulClientFactory.createConsulClient(configuration);
 		this.executor = Executors.newCachedThreadPool();
 		this.configuration = checkNotNull(configuration);
 
 		this.blobStore = checkNotNull(blobStoreService);
 
-        this.consulSessionActivator = new ConsulSessionActivator(clientProvider, 10);
+        this.consulSessionActivator = new ConsulSessionActivator(clientProvider, 10, consulMetricService);
 		this.consulSessionActivator.start();
 
-        this.runningJobsRegistry = new ConsulRunningJobsRegistry(() -> ConsulClientFactory.createConsulClient(configuration),
-                consulSessionActivator.getHolder(), jobStatusPath());
+		this.runningJobsRegistry = new ConsulRunningJobsRegistry(() -> ConsulClientFactory.createConsulClient(configuration),
+                consulSessionActivator.getHolder(), jobStatusPath(), consulMetricService);
 	}
 
 
 	@Override
 	public LeaderRetrievalService getJobManagerLeaderRetriever(JobID jobID) {
 		String leaderPath = getJobManagerLeaderPath(jobID);
-		return new ConsulLeaderRetrievalService(clientProvider, executor, leaderPath);
+		return new ConsulLeaderRetrievalService(clientProvider, executor, leaderPath, consulMetricService);
 	}
 
 	@Override
@@ -117,54 +136,54 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	@Override
 	public LeaderElectionService getJobManagerLeaderElectionService(JobID jobID) {
 		String leaderPath = getJobManagerLeaderPath(jobID);
-		return new ConsulLeaderElectionService(clientProvider, executor, consulSessionActivator.getHolder(), leaderPath);
+		return new ConsulLeaderElectionService(clientProvider, executor, consulSessionActivator.getHolder(), leaderPath, consulMetricService);
 	}
 
 	@Override
 	public LeaderRetrievalService getResourceManagerLeaderRetriever() {
-		return new ConsulLeaderRetrievalService(clientProvider, executor, getLeaderPath() + RESOURCE_MANAGER_LEADER_PATH);
+		return new ConsulLeaderRetrievalService(clientProvider, executor, getLeaderPath() + RESOURCE_MANAGER_LEADER_PATH, consulMetricService);
 	}
 
 	@Override
 	public LeaderElectionService getResourceManagerLeaderElectionService() {
 		return new ConsulLeaderElectionService(clientProvider, executor, consulSessionActivator.getHolder(),
-			getLeaderPath() + RESOURCE_MANAGER_LEADER_PATH);
+			getLeaderPath() + RESOURCE_MANAGER_LEADER_PATH, consulMetricService);
 	}
 
 	@Override
 	public LeaderRetrievalService getDispatcherLeaderRetriever() {
-		return new ConsulLeaderRetrievalService(clientProvider, executor, getLeaderPath() + DISPATCHER_LEADER_PATH);
+		return new ConsulLeaderRetrievalService(clientProvider, executor, getLeaderPath() + DISPATCHER_LEADER_PATH, consulMetricService);
 	}
 
 	@Override
 	public LeaderElectionService getDispatcherLeaderElectionService() {
 		return new ConsulLeaderElectionService(clientProvider, executor, consulSessionActivator.getHolder(),
-			getLeaderPath() + DISPATCHER_LEADER_PATH);
+			getLeaderPath() + DISPATCHER_LEADER_PATH, consulMetricService);
 	}
 
 	@Override
 	public CheckpointRecoveryFactory getCheckpointRecoveryFactory() {
-        return new ConsulCheckpointRecoveryFactory(clientProvider, configuration, executor);
+        return new ConsulCheckpointRecoveryFactory(clientProvider, configuration, executor, consulMetricService);
 	}
 
 	@Override
     public LeaderRetrievalService getClusterRestEndpointLeaderRetriever() {
-        return new ConsulLeaderRetrievalService(clientProvider, executor, getLeaderPath() + REST_SERVER_LEADER_PATH);
+        return new ConsulLeaderRetrievalService(clientProvider, executor, getLeaderPath() + REST_SERVER_LEADER_PATH, consulMetricService);
     }
 
     @Override
     public LeaderElectionService getClusterRestEndpointLeaderElectionService() {
         return new ConsulLeaderElectionService(clientProvider, executor, consulSessionActivator.getHolder(),
-                getLeaderPath() + REST_SERVER_LEADER_PATH);
+                getLeaderPath() + REST_SERVER_LEADER_PATH, consulMetricService);
     }
 
     @Override
     public JobGraphStore getJobGraphStore() throws Exception {
-        return new ConsulSubmittedJobGraphStore(configuration, clientProvider, jobGraphsPath());
+        return new ConsulSubmittedJobGraphStore(configuration, clientProvider, jobGraphsPath(), consulMetricService);
 	}
 
 	@Override
-	public JobResultStore getJobResultStore() throws Exception {
+	public RunningJobsRegistry getRunningJobsRegistry() throws Exception {
 		return runningJobsRegistry;
 	}
 
@@ -200,5 +219,17 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	private String jobGraphsPath() {
 		return configuration.getString(ConsulHighAvailabilityOptions.HA_CONSUL_ROOT)
 			+ configuration.getString(ConsulHighAvailabilityOptions.HA_CONSUL_JOBGRAPHS_PATH);
+	}
+
+	/**
+	 * This method is an entry point to register a metric to the Flink metric by creating MetricRegistry.
+	 * @param configuration The runtime configuration.
+	 * */
+	private MetricRegistry createMetricRegistry(Configuration configuration) {
+		LOG.info("Create metric registry");
+		PluginManager pluginManager =
+				PluginUtils.createPluginManagerFromRootFolder(configuration);
+		return new MetricRegistryImpl(MetricRegistryConfiguration.fromConfiguration(configuration),
+				ReporterSetup.fromConfiguration(configuration, pluginManager));
 	}
 }

@@ -4,12 +4,11 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import com.espro.flink.consul.metric.ConsulMetricService;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServicesUtils;
@@ -18,16 +17,15 @@ import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.persistence.RetrievableStateStorageHelper;
 import org.apache.flink.runtime.persistence.filesystem.FileSystemStateStorageHelper;
 import org.apache.flink.runtime.state.RetrievableStateHandle;
+import org.apache.flink.shaded.guava18.com.google.common.base.Stopwatch;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.function.ThrowingRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.kv.model.GetBinaryValue;
-
 
 /**
  * Stores the state of the job graph to the configured HA storage directory and only a pointer (RetrievableStateHandle) of the state to
@@ -45,14 +43,16 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 	private final String jobgraphsPath;
     private final RetrievableStateStorageHelper<JobGraph> jobGraphStateStorage;
     private JobGraphListener listener;
+    private final ConsulMetricService consulMetricService;
 
-    public ConsulSubmittedJobGraphStore(Configuration configuration, Supplier<ConsulClient> client, String jobgraphsPath)
+    public ConsulSubmittedJobGraphStore(Configuration configuration, Supplier<ConsulClient> client, String jobgraphsPath, ConsulMetricService consulMetricService)
             throws IOException {
 		this.client = Preconditions.checkNotNull(client, "client");
 		this.jobgraphsPath = Preconditions.checkNotNull(jobgraphsPath, "jobgraphsPath");
         Preconditions.checkArgument(jobgraphsPath.endsWith("/"), "jobgraphsPath must end with /");
         this.jobGraphStateStorage = new FileSystemStateStorageHelper<>(
                 HighAvailabilityServicesUtils.getClusterHighAvailableStoragePath(configuration), "jobGraph");
+        this.consulMetricService = consulMetricService;
 	}
 
 	@Override
@@ -75,7 +75,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
             // smaller than the state itself.
             byte[] bytes = InstantiationUtil.serializeObject(stateHandle);
             LOG.debug("{} bytes will be written to Consul.", bytes.length);
+            Stopwatch started = Stopwatch.createStarted();
             Boolean response = client.get().setKVBinaryValue(path(jobGraph.getJobID()), bytes).getValue();
+            this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
             success = response == null ? false : response;
         } finally {
             // Cleanup the state handle if it was not written to Consul
@@ -91,43 +93,10 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
         return getStateHandle(jobId).retrieveState();
     }
 
-    @Override
-    public CompletableFuture<Void> localCleanupAsync(JobID jobId, Executor executor) {
-        return runAsyncWithLockAssertRunning(
-                () -> {
-                    LOG.debug("Releasing job graph {}.", jobId);
-                    removeJobGraph(jobId);
-                    LOG.info("Released job graph {} .", jobId);
-                },
-                executor);
-    }
-
-    @Override
-    public CompletableFuture<Void> globalCleanupAsync(JobID jobId, Executor executor) {
-        return runAsyncWithLockAssertRunning(
-                () -> {
-                    LOG.debug("Releasing job graph {}.", jobId);
-                    removeJobGraph(jobId);
-                    LOG.info("Released job graph {} .", jobId);
-                },
-                executor);
-    }
-
-    private CompletableFuture<Void> runAsyncWithLockAssertRunning(
-            ThrowingRunnable<Exception> runnable, Executor executor) {
-        return CompletableFuture.runAsync(
-                () -> {
-                        try {
-                            runnable.run();
-                        } catch (Exception e) {
-                            throw new CompletionException(e);
-                        }
-                },
-                executor);
-    }
-
     private RetrievableStateHandle<JobGraph> getStateHandle(JobID jobId) throws FlinkException {
+        Stopwatch started = Stopwatch.createStarted();
         GetBinaryValue value = client.get().getKVBinaryValue(path(jobId)).getValue();
+        this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		if (value != null) {
 			try {
                 return InstantiationUtil.deserializeObject(value.getValue(),
@@ -148,8 +117,10 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
             LOG.warn("Could not retrieve the state handle from Consul {}.", path(jobId), e);
         }
 
+        Stopwatch started = Stopwatch.createStarted();
         // First remove state from Consul (Independent of errors when reading the state handler)
         client.get().deleteKVValue(path(jobId));
+        this.consulMetricService.updateWriteMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 
         if (stateHandle != null) {
             stateHandle.discardState();
@@ -160,7 +131,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 
 	@Override
 	public Collection<JobID> getJobIds() throws Exception {
+        Stopwatch started = Stopwatch.createStarted();
         List<String> value = client.get().getKVKeysOnly(jobgraphsPath).getValue();
+        this.consulMetricService.updateReadMetrics(started.elapsed(TimeUnit.MILLISECONDS));
 		if (value != null) {
 			return value.stream()
 				.map(id -> id.split("/"))
@@ -173,4 +146,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 	private String path(JobID jobID) {
 		return jobgraphsPath + jobID.toString();
 	}
+
+    @Override
+    public void releaseJobGraph(JobID jobId) throws Exception {
+        // can be ignored, because no lock is held
+    }
 }
