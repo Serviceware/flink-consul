@@ -52,11 +52,14 @@ import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.MetricRegistryConfiguration;
 import org.apache.flink.runtime.metrics.MetricRegistryImpl;
 import org.apache.flink.runtime.metrics.ReporterSetup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of {@link HighAvailabilityServices} using Hashicorp Consul.
  */
 public class ConsulHaServices implements HighAvailabilityServices {
+	private static final Logger LOG = LoggerFactory.getLogger(ConsulHaServices.class);
 
 	private static final String RESOURCE_MANAGER_LEADER_PATH = "resource_manager_lock";
 
@@ -100,7 +103,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
     public ConsulHaServices(Executor executor,
 							Configuration configuration,
 							BlobStoreService blobStoreService) {
-
+		LOG.info("ConsulHaServices constructor");
 		MetricRegistry metricRegistry = createMetricRegistry(configuration);
 		ConsulMetricGroup consulMetricGroup = new ConsulMetricGroup(metricRegistry, configuration.getString(JobManagerOptions.BIND_HOST));
 		this.consulMetricService = new ConsulMetricService(consulMetricGroup);
@@ -223,6 +226,7 @@ public class ConsulHaServices implements HighAvailabilityServices {
 	 * @param configuration The runtime configuration.
 	 * */
 	private MetricRegistry createMetricRegistry(Configuration configuration) {
+		LOG.info("Create metric registry");
 		PluginManager pluginManager =
 				PluginUtils.createPluginManagerFromRootFolder(configuration);
 		return new MetricRegistryImpl(MetricRegistryConfiguration.fromConfiguration(configuration),
