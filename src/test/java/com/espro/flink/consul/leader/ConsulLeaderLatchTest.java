@@ -20,23 +20,14 @@ package com.espro.flink.consul.leader;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import static com.espro.flink.consul.leader.ConsulLeaderData.UNKNOWN_ADDRESS;
-
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Matchers;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.espro.flink.consul.AbstractConsulTest;
@@ -46,7 +37,6 @@ import com.espro.flink.consul.ConsulSessionHolder;
 public class ConsulLeaderLatchTest extends AbstractConsulTest {
 
 	private ConsulClient client;
-	private Executor executor = Executors.newFixedThreadPool(8);
 	private int waitTime = 1;
 	private ConsulSessionActivator sessionActivator1;
 	private ConsulSessionHolder sessionHolder1;
@@ -78,13 +68,13 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 
 		ConsulLeaderLatchListener listener = mock(ConsulLeaderLatchListener.class);
 
-        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime);
+        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, sessionHolder1, leaderKey, listener, waitTime);
 		latch.start();
 
         awaitLeaderElection();
-        verify(listener).onLeadershipAcquired(Matchers.eq(UNKNOWN_ADDRESS), eq(latch.getFlinkSessionId()));
+        verify(listener).isLeader();
 
-        assertTrue(latch.hasLeadership(latch.getFlinkSessionId()));
+        assertTrue(latch.hasLeadership());
 
 		latch.stop();
 	}
@@ -96,34 +86,28 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 		ConsulLeaderLatchListener listener1 = mock(ConsulLeaderLatchListener.class);
 		ConsulLeaderLatchListener listener2 = mock(ConsulLeaderLatchListener.class);
 
-		LeaderRetrievalListener retrievalListener = mock(LeaderRetrievalListener.class);
+        ConsulLeaderLatch latch1 = new ConsulLeaderLatch(() -> client, sessionHolder1, leaderKey, listener1, waitTime);
+        ConsulLeaderLatch latch2 = new ConsulLeaderLatch(() -> client, sessionHolder2, leaderKey, listener2, waitTime);
 
-        ConsulLeaderLatch latch1 = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener1, waitTime);
-        ConsulLeaderLatch latch2 = new ConsulLeaderLatch(() -> client, executor, sessionHolder2, leaderKey, listener2, waitTime);
-        ConsulLeaderRetriever leaderResolver = new ConsulLeaderRetriever(() -> client, executor, leaderKey, retrievalListener, 1);
-
-		leaderResolver.start();
 		latch1.start();
         awaitLeaderElection();
 
 		latch2.start();
         awaitLeaderElection();
 
-        verify(listener1).onLeadershipAcquired(eq(UNKNOWN_ADDRESS), eq(latch1.getFlinkSessionId()));
-        verify(retrievalListener).notifyLeaderAddress(Matchers.eq(UNKNOWN_ADDRESS), eq(latch1.getFlinkSessionId()));
-        assertTrue(latch1.hasLeadership(latch1.getFlinkSessionId()));
-        assertFalse(latch2.hasLeadership(latch2.getFlinkSessionId()));
+        verify(listener1).isLeader();
+        assertTrue(latch1.hasLeadership());
+        assertFalse(latch2.hasLeadership());
 
 		latch1.stop();
         awaitLeaderElection();
-        verify(listener2).onLeadershipAcquired(Matchers.eq(UNKNOWN_ADDRESS), eq(latch2.getFlinkSessionId()));
-        assertFalse(latch1.hasLeadership(latch1.getFlinkSessionId()));
-        assertTrue(latch2.hasLeadership(latch2.getFlinkSessionId()));
+        verify(listener2).isLeader();
+        assertFalse(latch1.hasLeadership());
+        assertTrue(latch2.hasLeadership());
 
 		latch2.stop();
-        assertFalse(latch1.hasLeadership(latch1.getFlinkSessionId()));
-        assertFalse(latch2.hasLeadership(latch2.getFlinkSessionId()));
-
+        assertFalse(latch1.hasLeadership());
+        assertFalse(latch2.hasLeadership());
 	}
 
 	@Test
@@ -132,43 +116,22 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 
 		ConsulLeaderLatchListener listener = mock(ConsulLeaderLatchListener.class);
 
-        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime);
+        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, sessionHolder1, leaderKey, listener, waitTime);
 		latch.start();
 
         awaitLeaderElection();
-        verify(listener).onLeadershipAcquired(Matchers.eq(UNKNOWN_ADDRESS), eq(latch.getFlinkSessionId()));
-        assertTrue(latch.hasLeadership(latch.getFlinkSessionId()));
+        verify(listener).isLeader();
+        assertTrue(latch.hasLeadership());
 
 		consul.reset();
 		Thread.sleep(1000 * waitTime);
-		verify(listener).onLeadershipRevoked();
-        assertFalse(latch.hasLeadership(latch.getFlinkSessionId()));
-
-		latch.stop();
-	}
-
-	@Test
-    public void testWithConsulNotReachable() throws Exception {
-		consul.close();
-
-		String leaderKey = "test-key";
-
-		ConsulLeaderLatchListener listener = mock(ConsulLeaderLatchListener.class);
-		LeaderRetrievalListener retrievalListener = mock(LeaderRetrievalListener.class);
-
-        ConsulLeaderLatch latch = new ConsulLeaderLatch(() -> client, executor, sessionHolder1, leaderKey, listener, waitTime);
-        ConsulLeaderRetriever leaderResolver = new ConsulLeaderRetriever(() -> client, executor, leaderKey, retrievalListener, 1);
-
-		leaderResolver.start();
-		latch.start();
-
-        awaitLeaderElection();
-		verify(retrievalListener, atLeastOnce()).handleError(any(Exception.class));
+        verify(listener).notLeader();
+        assertFalse(latch.hasLeadership());
 
 		latch.stop();
 	}
 
     private void awaitLeaderElection() throws Exception {
-        TimeUnit.SECONDS.sleep(waitTime);
+        TimeUnit.SECONDS.sleep(2 * waitTime);
     }
 }

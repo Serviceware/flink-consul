@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.kv.model.GetBinaryValue;
+import com.espro.flink.consul.ConsulHaConfigurationUtils;
 
 
 /**
@@ -46,10 +47,10 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
     private final RetrievableStateStorageHelper<JobGraph> jobGraphStateStorage;
     private JobGraphListener listener;
 
-    public ConsulSubmittedJobGraphStore(Configuration configuration, Supplier<ConsulClient> client, String jobgraphsPath)
+    public ConsulSubmittedJobGraphStore(Configuration configuration, Supplier<ConsulClient> client)
             throws IOException {
 		this.client = Preconditions.checkNotNull(client, "client");
-		this.jobgraphsPath = Preconditions.checkNotNull(jobgraphsPath, "jobgraphsPath");
+        this.jobgraphsPath = ConsulHaConfigurationUtils.jobGraphsPathFromConfiguration(configuration);
         Preconditions.checkArgument(jobgraphsPath.endsWith("/"), "jobgraphsPath must end with /");
         this.jobGraphStateStorage = new FileSystemStateStorageHelper<>(
                 HighAvailabilityServicesUtils.getClusterHighAvailableStoragePath(configuration), "jobGraph");

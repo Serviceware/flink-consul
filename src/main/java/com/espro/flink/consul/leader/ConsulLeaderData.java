@@ -35,27 +35,22 @@ import org.apache.flink.util.Preconditions;
  */
 final class ConsulLeaderData {
 
-    static final String UNKNOWN_ADDRESS = "unknown";
+    private final UUID leaderIdentifier;
 
-	private final String address;
-	private final UUID sessionId;
-
-	public ConsulLeaderData(String address, UUID sessionId) {
-        this.address = address == null ? UNKNOWN_ADDRESS : address;
-		this.sessionId = Preconditions.checkNotNull(sessionId, "sessionId");
+    public ConsulLeaderData(UUID leaderIdentifier) {
+        this.leaderIdentifier = Preconditions.checkNotNull(leaderIdentifier, "sessionId");
 	}
 
-	public static ConsulLeaderData from(String address, UUID sessionId) {
-		return new ConsulLeaderData(address, sessionId);
+    public static ConsulLeaderData from(UUID leaderIdentifier) {
+        return new ConsulLeaderData(leaderIdentifier);
 	}
 
 	public static ConsulLeaderData from(byte[] bytes) {
 		try {
 			ByteArrayInputStream is = new ByteArrayInputStream(bytes);
 			ObjectInputStream ois = new ObjectInputStream(is);
-			String address = ois.readUTF();
-			UUID sessionId = (UUID) ois.readObject();
-			return new ConsulLeaderData(address, sessionId);
+            UUID leaderIdentifier = (UUID) ois.readObject();
+            return new ConsulLeaderData(leaderIdentifier);
 		} catch (IOException | ClassNotFoundException e) {
 			throw new IllegalArgumentException("ConsulLeaderData deserialization failure", e);
 		}
@@ -65,20 +60,15 @@ final class ConsulLeaderData {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		try {
 			ObjectOutputStream oos = new ObjectOutputStream(baos);
-			oos.writeUTF(address);
-			oos.writeObject(sessionId);
+            oos.writeObject(leaderIdentifier);
 			return baos.toByteArray();
 		} catch (IOException e) {
 			throw new IllegalStateException("ConsulLeaderData serialization failure", e);
 		}
 	}
 
-	public String getAddress() {
-		return address;
-	}
-
-	public UUID getSessionId() {
-		return sessionId;
+    public UUID getLeaderIdentifier() {
+        return leaderIdentifier;
 	}
 
 	@Override
