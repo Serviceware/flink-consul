@@ -138,7 +138,7 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
 
     private void leaderRetrieved(LeaderInformation leaderInformation) {
         notifyOnLeaderRetrieved(leaderInformation);
-        LOG.info("Cluster leader retrieved {}", leaderInformation);
+        LOG.debug("Cluster leader retrieved {}", leaderInformation);
 	}
 
     private void notifyOnLeaderRetrieved(LeaderInformation leaderInformation) {
