@@ -30,7 +30,7 @@ public class ConsulLeaderDataTest {
 	public void testSerialization() {
 		UUID sessionId = UUID.randomUUID();
 
-        ConsulLeaderData data = new ConsulLeaderData(sessionId);
+        ConsulLeaderData data = ConsulLeaderData.from(sessionId);
 
 		ConsulLeaderData deser = ConsulLeaderData.from(data.toBytes());
 

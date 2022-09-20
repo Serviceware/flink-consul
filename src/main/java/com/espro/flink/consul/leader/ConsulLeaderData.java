@@ -37,7 +37,7 @@ final class ConsulLeaderData {
 
     private final UUID leaderIdentifier;
 
-    public ConsulLeaderData(UUID leaderIdentifier) {
+    private ConsulLeaderData(UUID leaderIdentifier) {
         this.leaderIdentifier = Preconditions.checkNotNull(leaderIdentifier, "sessionId");
 	}
 
@@ -50,7 +50,7 @@ final class ConsulLeaderData {
 			ByteArrayInputStream is = new ByteArrayInputStream(bytes);
 			ObjectInputStream ois = new ObjectInputStream(is);
             UUID leaderIdentifier = (UUID) ois.readObject();
-            return new ConsulLeaderData(leaderIdentifier);
+            return from(leaderIdentifier);
 		} catch (IOException | ClassNotFoundException e) {
 			throw new IllegalArgumentException("ConsulLeaderData deserialization failure", e);
 		}

@@ -154,7 +154,7 @@ final class ConsulLeaderLatch {
 		PutParams putParams = new PutParams();
 		putParams.setAcquireSession(sessionHolder.getSessionId());
 		try {
-            ConsulLeaderData data = new ConsulLeaderData(leaderIdentifier);
+            ConsulLeaderData data = ConsulLeaderData.from(leaderIdentifier);
             Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
             return response != null && response;
 		} catch (OperationException ex) {
