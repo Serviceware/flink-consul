@@ -17,8 +17,6 @@
  */
 package com.espro.flink.consul;
 
-import static com.espro.flink.consul.ConsulHaConfigurationUtils.jobStatusPathFromConfiguration;
-
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -29,7 +27,6 @@ import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServicesFactory;
 
 import com.ecwid.consul.v1.ConsulClient;
-import com.espro.flink.consul.jobregistry.ConsulRunningJobsRegistry;
 
 public class ConsulHaServicesFactory implements HighAvailabilityServicesFactory {
 
@@ -41,10 +38,10 @@ public class ConsulHaServicesFactory implements HighAvailabilityServicesFactory 
 
         ConsulSessionActivator consulSessionActivator = new ConsulSessionActivator(clientProvider, 10);
         consulSessionActivator.start();
-        ConsulRunningJobsRegistry consulJobResultStore = new ConsulRunningJobsRegistry(clientProvider, consulSessionActivator.getHolder(),
-                jobStatusPathFromConfiguration(configuration));
+        // ConsulRunningJobsRegistry consulJobResultStore = new ConsulRunningJobsRegistry(clientProvider,
+        // consulSessionActivator.getHolder(),
+        // jobStatusPathFromConfiguration(configuration));
 
-        return new ConsulHaServices(executor, configuration, blobStoreService, clientProvider, consulSessionActivator,
-                consulJobResultStore);
+        return new ConsulHaServices(executor, configuration, blobStoreService, clientProvider, consulSessionActivator);
     }
 }

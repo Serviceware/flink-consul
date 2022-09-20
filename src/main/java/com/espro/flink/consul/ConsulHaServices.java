@@ -22,6 +22,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import static com.espro.flink.consul.ConsulHaConfigurationUtils.leaderPathFromConfiguration;
 
+import java.io.IOException;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -33,8 +34,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.BlobStoreService;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.highavailability.AbstractHaServices;
+import org.apache.flink.runtime.highavailability.FileSystemJobResultStore;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
-import org.apache.flink.runtime.highavailability.JobResultStore;
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.leaderelection.DefaultLeaderElectionService;
 import org.apache.flink.runtime.leaderelection.DefaultMultipleComponentLeaderElectionService;
@@ -82,9 +83,8 @@ public class ConsulHaServices extends AbstractHaServices {
 							Configuration configuration,
                             BlobStoreService blobStoreService,
                             Supplier<ConsulClient> clientProvider,
-                            ConsulSessionActivator consulSessionActivator,
-                            JobResultStore jobResultStore) {
-        super(configuration, executor, blobStoreService, jobResultStore);
+            ConsulSessionActivator consulSessionActivator) throws IOException {
+        super(configuration, executor, blobStoreService, FileSystemJobResultStore.fromConfiguration(configuration));
         this.clientProvider = checkNotNull(clientProvider);
 		this.consulSessionActivator = checkNotNull(consulSessionActivator);
 	}
