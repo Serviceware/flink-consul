@@ -45,7 +45,7 @@ public class ConsulCheckpointStoreUtil implements CheckpointStoreUtil {
     @Override
     public long nameToCheckpointID(String name) {
         try {
-            return Long.parseLong(name.replace(jobPath(), ""));
+            return Long.parseLong(name.substring(jobPath().length()));
         } catch (NumberFormatException e) {
             LOG.warn("Unable to parse the given name {} to an checkpoint id for jop path {}.", name, jobPath());
             return INVALID_CHECKPOINT_ID;

@@ -27,7 +27,8 @@ public class ConsulCheckpointStoreUtilTest {
 
         // GIVEN expected checkpoint id and checkpoint name
         long expectedCheckpointId = 10L;
-        String checkpointName = CHECKPOINT_PATH + jobID.toString() + expectedCheckpointId;
+        JobID oldJobId = JobID.generate();
+        String checkpointName = CHECKPOINT_PATH + oldJobId.toString() + expectedCheckpointId;
 
         // WHEN name is converted to checkpoint id, the resulting checkpoint id is equal to expected one
         assertEquals(expectedCheckpointId, storeUtil.nameToCheckpointID(checkpointName));
