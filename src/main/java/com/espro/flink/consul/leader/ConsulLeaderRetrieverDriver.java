@@ -89,7 +89,7 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
 	public void start() {
 		LOG.info("Starting Consul Leader Retriever");
 		runnable = true;
-        watchFuture = executor.scheduleAtFixedRate(this::watch, 0, 2, TimeUnit.SECONDS);
+        watchFuture = executor.scheduleAtFixedRate(this::watch, 0, 5, TimeUnit.SECONDS);
 	}
 
     @Override
@@ -132,8 +132,13 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
 		QueryParams queryParams = QueryParams.Builder.builder()
 			.setWaitTime(waitTime)
 			.build();
-        Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(connectionInformationPath, queryParams);
-		return leaderKeyValue.getValue();
+        try {
+            Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(connectionInformationPath, queryParams);
+            return leaderKeyValue.getValue();
+        } catch (Exception e) {
+            LOG.warn("Error while reading the connection information", e);
+            return null;
+        }
 	}
 
     private void leaderRetrieved(LeaderInformation leaderInformation) {
