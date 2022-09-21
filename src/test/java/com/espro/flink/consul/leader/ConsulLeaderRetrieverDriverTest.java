@@ -61,7 +61,7 @@ public class ConsulLeaderRetrieverDriverTest extends AbstractConsulTest {
 
     @Test
     public void testNoLeader() {
-        Awaitility.await().atMost(Duration.ofSeconds(10))
+        Awaitility.await().atMost(Duration.ofSeconds(30))
                 .untilAsserted(() -> verify(leaderRetrievalEventHandler, times(4)).notifyLeaderAddress(empty()));
 
         verify(fatalErrorHandler, never()).onFatalError(any(Throwable.class));
@@ -72,7 +72,7 @@ public class ConsulLeaderRetrieverDriverTest extends AbstractConsulTest {
         LeaderInformation expectedLeaderInformation = LeaderInformation.known(UUID.randomUUID(), UUID.randomUUID().toString());
         writeLeaderInformation(expectedLeaderInformation);
 
-        Awaitility.await().atMost(Duration.ofSeconds(10))
+        Awaitility.await().atMost(Duration.ofSeconds(15))
                 .untilAsserted(() -> verify(leaderRetrievalEventHandler, atLeastOnce()).notifyLeaderAddress(expectedLeaderInformation));
 
         verify(fatalErrorHandler, never()).onFatalError(any(Throwable.class));
