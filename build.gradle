@@ -7,7 +7,7 @@ version '1.8.0-sw-SNAPSHOT'
 
 apply plugin: 'java'
 
-def flinkVersion = "1.15.0"
+def flinkVersion = "1.15.2"
 
 repositories {
     mavenLocal()
