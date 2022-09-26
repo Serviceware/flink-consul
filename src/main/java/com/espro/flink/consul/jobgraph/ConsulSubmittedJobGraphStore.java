@@ -89,6 +89,7 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 
 	@Override
     public JobGraph recoverJobGraph(JobID jobId) throws Exception {
+        LOG.debug("Recover job graph for job {}.", jobId);
         return getStateHandle(jobId).retrieveState();
     }
 
@@ -96,9 +97,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
     public CompletableFuture<Void> localCleanupAsync(JobID jobId, Executor executor) {
         return runAsyncWithLockAssertRunning(
                 () -> {
-                    LOG.debug("Releasing job graph {}.", jobId);
+                    LOG.debug("Asynchronously releasing job graph for job {} (local).", jobId);
                     removeJobGraph(jobId);
-                    LOG.info("Released job graph {} .", jobId);
+                    LOG.info("Asynchronously released job graph for job {} (local).", jobId);
                 },
                 executor);
     }
@@ -107,9 +108,9 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
     public CompletableFuture<Void> globalCleanupAsync(JobID jobId, Executor executor) {
         return runAsyncWithLockAssertRunning(
                 () -> {
-                    LOG.debug("Releasing job graph {}.", jobId);
+                    LOG.debug("Asynchronously releasing job graph for job {} (global).", jobId);
                     removeJobGraph(jobId);
-                    LOG.info("Released job graph {} .", jobId);
+                    LOG.info("Asynchronously released job graph for job {} (global).", jobId);
                 },
                 executor);
     }
@@ -142,6 +143,8 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
     }
 
     public void removeJobGraph(JobID jobId) throws Exception {
+        LOG.debug("Job graph for job {} will be removed.", jobId);
+
         RetrievableStateHandle<JobGraph> stateHandle = null;
         try {
             stateHandle = getStateHandle(jobId);
@@ -163,6 +166,7 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 	public Collection<JobID> getJobIds() throws Exception {
         List<String> value = client.get().getKVKeysOnly(jobgraphsPath).getValue();
 		if (value != null) {
+            LOG.debug("Found {} job entries in {}", value, jobgraphsPath);
 			return value.stream()
 				.map(id -> id.split("/"))
 				.map(parts -> parts[parts.length - 1])
