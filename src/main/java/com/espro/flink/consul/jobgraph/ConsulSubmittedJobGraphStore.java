@@ -172,6 +172,8 @@ public final class ConsulSubmittedJobGraphStore implements JobGraphStore {
 				.map(parts -> parts[parts.length - 1])
 				.map(JobID::fromHexString).collect(Collectors.toList());
 		}
+
+        LOG.debug("Found no job ids in job graph store.");
 		return Collections.emptyList();
 	}
 
