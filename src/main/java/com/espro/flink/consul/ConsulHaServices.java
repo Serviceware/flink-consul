@@ -36,19 +36,24 @@ import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.highavailability.AbstractHaServices;
 import org.apache.flink.runtime.highavailability.FileSystemJobResultStore;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
+import org.apache.flink.runtime.highavailability.HighAvailabilityServicesUtils;
+import org.apache.flink.runtime.jobmanager.DefaultJobGraphStore;
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
+import org.apache.flink.runtime.jobmanager.NoOpJobGraphStoreWatcher;
 import org.apache.flink.runtime.leaderelection.DefaultLeaderElectionService;
 import org.apache.flink.runtime.leaderelection.DefaultMultipleComponentLeaderElectionService;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.leaderelection.MultipleComponentLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.DefaultLeaderRetrievalService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.persistence.filesystem.FileSystemStateStorageHelper;
 import org.apache.flink.util.FatalExitExceptionHandler;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.espro.flink.consul.checkpoint.ConsulCheckpointRecoveryFactory;
-import com.espro.flink.consul.jobgraph.ConsulSubmittedJobGraphStore;
+import com.espro.flink.consul.jobgraph.ConsulJobGraphStoreUtil;
 import com.espro.flink.consul.leader.ConsulLeaderElectionDriverFactory;
 import com.espro.flink.consul.leader.ConsulLeaderRetrievalDriverFactory;
 
@@ -121,7 +126,12 @@ public class ConsulHaServices extends AbstractHaServices {
 
     @Override
     protected JobGraphStore createJobGraphStore() throws Exception {
-        return new ConsulSubmittedJobGraphStore(configuration, clientProvider);
+        String jobgraphsPath = ConsulHaConfigurationUtils.jobGraphsPathFromConfiguration(configuration);
+        Preconditions.checkArgument(jobgraphsPath.endsWith("/"), "jobgraphsPath must end with /");
+
+        return new DefaultJobGraphStore<>(new ConsulStateHandleStore<>(clientProvider, new FileSystemStateStorageHelper<>(
+                HighAvailabilityServicesUtils.getClusterHighAvailableStoragePath(configuration), "jobGraph"), jobgraphsPath),
+                NoOpJobGraphStoreWatcher.INSTANCE, ConsulJobGraphStoreUtil.INSTANCE);
     }
 
     @Override
