@@ -137,16 +137,16 @@ public class ConsulHaServices extends AbstractHaServices {
     @Override
     protected LeaderElectionService createLeaderElectionService(String leaderName) {
         return new DefaultLeaderElectionService(
-                getOrInitializeSingleLeaderElectionService().createDriverFactory(leaderName));
+                getOrInitializeSingleLeaderElectionService(leaderName).createDriverFactory(leaderName));
     }
 
-    private MultipleComponentLeaderElectionService getOrInitializeSingleLeaderElectionService() {
+    private MultipleComponentLeaderElectionService getOrInitializeSingleLeaderElectionService(String leaderName) {
         synchronized (lock) {
             if (multipleComponentLeaderElectionService == null) {
                 try {
                     multipleComponentLeaderElectionService = new DefaultMultipleComponentLeaderElectionService(
                             error -> FatalExitExceptionHandler.INSTANCE.uncaughtException(Thread.currentThread(), error),
-                            new ConsulLeaderElectionDriverFactory(clientProvider, consulSessionActivator.getHolder()));
+                            new ConsulLeaderElectionDriverFactory(clientProvider, consulSessionActivator.getHolder(), leaderName));
                 } catch (Exception e) {
                     throw new FlinkRuntimeException(
                             String.format(

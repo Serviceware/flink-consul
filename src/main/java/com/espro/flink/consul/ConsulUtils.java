@@ -77,8 +77,8 @@ public final class ConsulUtils {
      *
      * @return path to key that holds information for latch
      */
-    public static String getLeaderLatchPath() {
-        return generateConsulPath(LEADER_LATCH_NODE);
+    public static String getLeaderLatchPath(String basePath) {
+        return generateConsulPath(basePath, LEADER_LATCH_NODE);
     }
 
     /**

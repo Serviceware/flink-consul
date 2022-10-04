@@ -20,15 +20,18 @@ public class ConsulLeaderElectionDriverFactory implements MultipleComponentLeade
 
     private final Supplier<ConsulClient> clientProvider;
     private final ConsulSessionHolder sessionHolder;
+    private final String leaderBasePath;
 
-    public ConsulLeaderElectionDriverFactory(Supplier<ConsulClient> clientProvider, ConsulSessionHolder sessionHolder) {
+    public ConsulLeaderElectionDriverFactory(Supplier<ConsulClient> clientProvider, ConsulSessionHolder sessionHolder,
+            String leaderBasePath) {
         this.clientProvider = clientProvider;
         this.sessionHolder = sessionHolder;
+        this.leaderBasePath = leaderBasePath;
     }
 
     @Override
     public MultipleComponentLeaderElectionDriver create(Listener leaderElectionListener) throws Exception {
-        return new ConsulLeaderElectionDriver(clientProvider, sessionHolder, leaderElectionListener);
+        return new ConsulLeaderElectionDriver(clientProvider, sessionHolder, leaderBasePath, leaderElectionListener);
     }
 
 }

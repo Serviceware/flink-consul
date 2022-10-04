@@ -25,12 +25,12 @@ public class ConsulLeaderElectionDriver implements MultipleComponentLeaderElecti
 
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    public ConsulLeaderElectionDriver(Supplier<ConsulClient> clientProvider, ConsulSessionHolder sessionHolder,
+    public ConsulLeaderElectionDriver(Supplier<ConsulClient> clientProvider, ConsulSessionHolder sessionHolder, String leaderBasePath,
             MultipleComponentLeaderElectionDriver.Listener leaderElectionListener) {
         this.clientProvider = clientProvider;
         this.leaderElectionListener = leaderElectionListener;
 
-        this.leaderLatch = new ConsulLeaderLatch(clientProvider, sessionHolder, ConsulUtils.getLeaderLatchPath(), this, 2);
+        this.leaderLatch = new ConsulLeaderLatch(clientProvider, sessionHolder, ConsulUtils.getLeaderLatchPath(leaderBasePath), this, 2);
         leaderLatch.start();
     }
 
