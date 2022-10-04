@@ -158,7 +158,8 @@ final class ConsulLeaderLatch {
             Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
             return response != null && response;
 		} catch (OperationException ex) {
-            LOG.error("Error while writing leader identifier {} to Consul.", leaderIdentifier, ex);
+            LOG.error("Error while writing leader identifier {} to Consul {}.", leaderIdentifier, leaderKey, ex);
+            LOG.debug("Details:", ex);
 			return false;
 		}
 	}
