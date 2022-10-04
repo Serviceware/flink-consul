@@ -94,7 +94,8 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         assertEquals(checkpoints.size(), stateHandleTuples.size());
 
         // THEN tuples for all created checkpoint are returned
-        Set<String> expectedCheckpointPaths = checkpoints.stream().map(c -> BASE_PATH + createCheckpointKey(jobID, c)).collect(Collectors.toSet());
+        Set<String> expectedCheckpointPaths = checkpoints.stream().map(c -> BASE_PATH + getCheckpointPath(jobID, c))
+                .collect(Collectors.toSet());
         for (Tuple2<RetrievableStateHandle<CompletedCheckpoint>, String> tuple : stateHandleTuples) {
             assertTrue(expectedCheckpointPaths.contains(tuple.f1));
             assertNotNull(tuple.f0);
@@ -133,7 +134,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
         // THEN all created checkpoint handles are returned
         for (CompletedCheckpoint completedCheckpoint : checkpoints) {
-            String expectedCheckpointHandle = createCheckpointKey(jobID, completedCheckpoint);
+            String expectedCheckpointHandle = getCheckpointPath(jobID, completedCheckpoint);
             assertTrue(allHandles.contains(expectedCheckpointHandle));
         }
     }
@@ -163,13 +164,13 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
 
         // WHEN getting checkpoint by path
-        boolean success = store.releaseAndTryRemove(createCheckpointKey(jobID, checkpoint));
+        boolean success = store.releaseAndTryRemove(getCheckpointPath(jobID, checkpoint));
 
         // THEN removal was successful
         assertTrue(success);
 
         // THEN state in Consul is deleted
-        assertNull(client.getKVBinaryValue(createCheckpointKey(jobID, checkpoint)).getValue());
+        assertNull(client.getKVBinaryValue(getCheckpointPath(jobID, checkpoint)).getValue());
     }
 
     @Test
@@ -189,7 +190,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
         // THEN all states in Consul are deleted
         for (CompletedCheckpoint completedCheckpoint : checkpoints) {
-            assertNull(client.getKVBinaryValue(createCheckpointKey(jobID, completedCheckpoint)).getValue());
+            assertNull(client.getKVBinaryValue(getCheckpointPath(jobID, completedCheckpoint)).getValue());
         }
     }
 
@@ -209,7 +210,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         IntegerResourceVersion resourceVersion = store.exists(createCheckpointKey(jobID, checkpoint));
 
         // THEN resource version is equal to modify index of Consul value
-        assertEquals(client.getKVBinaryValue(BASE_PATH + createCheckpointKey(jobID, checkpoint)).getValue().getModifyIndex(),
+        assertEquals(client.getKVBinaryValue(BASE_PATH + getCheckpointPath(jobID, checkpoint)).getValue().getModifyIndex(),
                 resourceVersion.getValue());
     }
 
@@ -229,7 +230,11 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         return checkpoint;
     }
 
-    private static String createCheckpointKey(JobID jobID, CompletedCheckpoint checkpoint2) {
+    private static String getCheckpointPath(JobID jobID, CompletedCheckpoint checkpoint2) {
         return jobID.toString() + checkpoint2.getCheckpointID();
+    }
+
+    private static String createCheckpointKey(JobID jobID, CompletedCheckpoint checkpoint2) {
+        return BASE_PATH + getCheckpointPath(jobID, checkpoint2);
     }
 }

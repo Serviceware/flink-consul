@@ -60,7 +60,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
         checkNotNull(keyName, "Name of key in Consul");
         checkNotNull(state, "State");
 
-        String fullConsulPathToKey = fullPathToKey(keyName);
+        String fullConsulPathToKey = normalizePath(keyName);
         LOG.debug("Add state to consul key/value store {}", fullConsulPathToKey);
 
         RetrievableStateHandle<T> storeHandle = storage.store(state);
@@ -85,7 +85,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
         checkNotNull(keyName, "Name of key in Consul");
         checkNotNull(state, "State");
 
-        String fullConsulPathToKey = fullPathToKey(keyName);
+        String fullConsulPathToKey = normalizePath(keyName);
         LOG.debug("Replace state in consul key/value store {}", fullConsulPathToKey);
 
         RetrievableStateHandle<T> oldStateHandle = get(fullConsulPathToKey);
@@ -109,7 +109,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     public IntegerResourceVersion exists(String keyName) throws Exception {
         checkNotNull(keyName, "Name of key in Consul");
 
-        String fullConsulPathToKey = fullPathToKey(keyName);
+        String fullConsulPathToKey = normalizePath(keyName);
 
         GetBinaryValue binaryValue = clientProvider.get().getKVBinaryValue(fullConsulPathToKey).getValue();
         if (binaryValue != null) {
@@ -122,7 +122,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     @Override
     public RetrievableStateHandle<T> getAndLock(String keyName) throws Exception {
         checkNotNull(keyName, "Name of key in Consul");
-        String fullConsulPathToKey = fullPathToKey(keyName);
+        String fullConsulPathToKey = normalizePath(keyName);
         return get(fullConsulPathToKey);
     }
 
@@ -166,7 +166,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     public boolean releaseAndTryRemove(String keyName) throws Exception {
         checkNotNull(keyName, "Name of key in Consul");
 
-        String fullConsulPathToKey = fullPathToKey(keyName);
+        String fullConsulPathToKey = normalizePath(keyName);
         LOG.debug("Remove state in consul key/value store {}", fullConsulPathToKey);
 
         RetrievableStateHandle<T> stateHandle = null;
@@ -241,21 +241,13 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
         }
     }
 
-    private String fullPathToKey(String keyName) {
-        return basePathInConsul + normalizePath(keyName);
-    }
-
     /**
-     * Makes sure that every path starts with a "/".
+     * Makes sure that every path starts without a "/".
      *
      * @param path Path to normalize
-     * @return Normalized path such that it starts with a "/"
+     * @return Normalized path such that it starts without a "/"
      */
     private static String normalizePath(String path) {
-        if (path.startsWith("/")) {
-            return path;
-        } else {
-            return '/' + path;
-        }
+        return StringUtils.removeStart(path, "/");
     }
 }
