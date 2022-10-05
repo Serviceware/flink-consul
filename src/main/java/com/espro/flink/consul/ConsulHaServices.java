@@ -131,7 +131,7 @@ public class ConsulHaServices extends AbstractHaServices {
 
         return new DefaultJobGraphStore<>(new ConsulStateHandleStore<>(clientProvider, new FileSystemStateStorageHelper<>(
                 HighAvailabilityServicesUtils.getClusterHighAvailableStoragePath(configuration), "jobGraph"), jobgraphsPath),
-                NoOpJobGraphStoreWatcher.INSTANCE, ConsulJobGraphStoreUtil.INSTANCE);
+                NoOpJobGraphStoreWatcher.INSTANCE, new ConsulJobGraphStoreUtil(jobgraphsPath));
     }
 
     @Override
