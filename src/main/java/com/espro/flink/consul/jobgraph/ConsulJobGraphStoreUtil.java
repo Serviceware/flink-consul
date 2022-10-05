@@ -35,6 +35,7 @@ public class ConsulJobGraphStoreUtil implements JobGraphStoreUtil {
     @Override
     public JobID nameToJobID(String name) {
         LOG.debug("Name {} for job graph is converted to job id.", name);
-        return JobID.fromHexString(name);
+        String nameWithoutBasePath = name.replace(jobGraphPath, "");
+        return JobID.fromHexString(nameWithoutBasePath.replace("/", ""));
     }
 }
