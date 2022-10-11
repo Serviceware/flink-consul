@@ -18,6 +18,7 @@
 package com.espro.flink.consul;
 
 import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.BlobStoreService;
@@ -25,11 +26,22 @@ import org.apache.flink.runtime.blob.BlobUtils;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServicesFactory;
 
+import com.ecwid.consul.v1.ConsulClient;
+
 public class ConsulHaServicesFactory implements HighAvailabilityServicesFactory {
 
     @Override
     public HighAvailabilityServices createHAServices(Configuration configuration, Executor executor) throws Exception {
         BlobStoreService blobStoreService = BlobUtils.createBlobStoreFromConfig(configuration);
-        return new ConsulHaServices(executor, configuration, blobStoreService);
+
+        Supplier<ConsulClient> clientProvider = () -> ConsulClientFactory.createConsulClient(configuration);
+
+        ConsulSessionActivator consulSessionActivator = new ConsulSessionActivator(clientProvider, 10);
+        consulSessionActivator.start();
+        // ConsulRunningJobsRegistry consulJobResultStore = new ConsulRunningJobsRegistry(clientProvider,
+        // consulSessionActivator.getHolder(),
+        // jobStatusPathFromConfiguration(configuration));
+
+        return new ConsulHaServices(executor, configuration, blobStoreService, clientProvider, consulSessionActivator);
     }
 }

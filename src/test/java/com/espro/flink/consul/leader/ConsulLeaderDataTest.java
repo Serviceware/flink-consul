@@ -18,25 +18,23 @@
 
 package com.espro.flink.consul.leader;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.Test;
 
 public class ConsulLeaderDataTest {
 
 	@Test
 	public void testSerialization() {
-		String address = "address-1";
 		UUID sessionId = UUID.randomUUID();
 
-		ConsulLeaderData data = new ConsulLeaderData(address, sessionId);
+        ConsulLeaderData data = ConsulLeaderData.from(sessionId);
 
 		ConsulLeaderData deser = ConsulLeaderData.from(data.toBytes());
 
-		assertEquals(address, deser.getAddress());
-		assertEquals(sessionId, deser.getSessionId());
+        assertEquals(sessionId, deser.getLeaderIdentifier());
 	}
 
 }

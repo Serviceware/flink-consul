@@ -1,10 +1,11 @@
 /*
  * Copyright (c) SABIO GmbH, Hamburg 2021 - All rights reserved
  */
-package com.espro.flink.consul.checkpoint;
+package com.espro.flink.consul;
 
 import static java.util.Collections.emptyList;
 
+import static org.apache.commons.lang3.StringUtils.removeEnd;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import java.io.IOException;
@@ -14,7 +15,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.persistence.IntegerResourceVersion;
 import org.apache.flink.runtime.persistence.RetrievableStateStorageHelper;
@@ -43,26 +46,29 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     private final RetrievableStateStorageHelper<T> storage;
 
-    private final String checkpointBasePath;
+    private final String basePathInConsul;
 
     public ConsulStateHandleStore(Supplier<ConsulClient> clientProvider, RetrievableStateStorageHelper<T> storage,
-            String checkpointBasePath) {
+            String basePathInConsul) {
         this.clientProvider = clientProvider;
         this.storage = storage;
-        this.checkpointBasePath = checkpointBasePath;
+        this.basePathInConsul = removeEnd(basePathInConsul, "/");
     }
 
     @Override
-    public RetrievableStateHandle<T> addAndLock(String pathInConsul, T state) throws Exception {
-        checkNotNull(pathInConsul, "Path in Consul");
+    public RetrievableStateHandle<T> addAndLock(String keyName, T state) throws Exception {
+        checkNotNull(keyName, "Name of key in Consul");
         checkNotNull(state, "State");
+
+        String fullConsulPathToKey = normalizePath(keyName);
+        LOG.debug("Add state to consul key/value store {}", fullConsulPathToKey);
 
         RetrievableStateHandle<T> storeHandle = storage.store(state);
         boolean success = false;
 
         try {
             byte[] serializedStoreHandle = InstantiationUtil.serializeObject(storeHandle);
-            success = clientProvider.get().setKVBinaryValue(pathInConsul, serializedStoreHandle).getValue();
+            success = clientProvider.get().setKVBinaryValue(fullConsulPathToKey, serializedStoreHandle).getValue();
             return storeHandle;
         } finally {
             if (!success) {
@@ -75,18 +81,21 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     }
 
     @Override
-    public void replace(String pathInConsul, IntegerResourceVersion resourceVersion, T state) throws Exception {
-        checkNotNull(pathInConsul, "Path in Consul");
+    public void replace(String keyName, IntegerResourceVersion resourceVersion, T state) throws Exception {
+        checkNotNull(keyName, "Name of key in Consul");
         checkNotNull(state, "State");
 
-        RetrievableStateHandle<T> oldStateHandle = get(pathInConsul);
+        String fullConsulPathToKey = normalizePath(keyName);
+        LOG.debug("Replace state in consul key/value store {}", fullConsulPathToKey);
+
+        RetrievableStateHandle<T> oldStateHandle = get(fullConsulPathToKey);
         RetrievableStateHandle<T> newStateHandle = storage.store(state);
 
         boolean success = false;
 
         try {
             byte[] serializedStoreHandle = InstantiationUtil.serializeObject(newStateHandle);
-            success = clientProvider.get().setKVBinaryValue(pathInConsul, serializedStoreHandle).getValue();
+            success = clientProvider.get().setKVBinaryValue(fullConsulPathToKey, serializedStoreHandle).getValue();
         } finally {
             if (success) {
                 oldStateHandle.discardState();
@@ -97,10 +106,12 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     }
 
     @Override
-    public IntegerResourceVersion exists(String pathInConsul) throws Exception {
-        checkNotNull(pathInConsul, "Path in Consul");
+    public IntegerResourceVersion exists(String keyName) throws Exception {
+        checkNotNull(keyName, "Name of key in Consul");
 
-        GetBinaryValue binaryValue = clientProvider.get().getKVBinaryValue(pathInConsul).getValue();
+        String fullConsulPathToKey = normalizePath(keyName);
+
+        GetBinaryValue binaryValue = clientProvider.get().getKVBinaryValue(fullConsulPathToKey).getValue();
         if (binaryValue != null) {
             return IntegerResourceVersion.valueOf((int) binaryValue.getModifyIndex());
         } else {
@@ -109,18 +120,19 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     }
 
     @Override
-    public RetrievableStateHandle<T> getAndLock(String pathInConsul) throws Exception {
-        checkNotNull(pathInConsul, "Path in Consul");
-        return get(pathInConsul);
+    public RetrievableStateHandle<T> getAndLock(String keyName) throws Exception {
+        checkNotNull(keyName, "Name of key in Consul");
+        String fullConsulPathToKey = normalizePath(keyName);
+        return get(fullConsulPathToKey);
     }
 
     @Override
     public List<Tuple2<RetrievableStateHandle<T>, String>> getAllAndLock() throws Exception {
         List<Tuple2<RetrievableStateHandle<T>, String>> stateHandles = new ArrayList<>();
 
-        List<GetBinaryValue> binaryValues = clientProvider.get().getKVBinaryValues(checkpointBasePath).getValue();
+        List<GetBinaryValue> binaryValues = clientProvider.get().getKVBinaryValues(basePathInConsul).getValue();
         if (binaryValues == null || binaryValues.isEmpty()) {
-            LOG.debug("No state handles present in Consul for key prefix {}", checkpointBasePath);
+            LOG.debug("No state handles present in Consul for key prefix {}", basePathInConsul);
             return Collections.emptyList();
         }
 
@@ -136,31 +148,39 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     @Override
     public Collection<String> getAllHandles() throws Exception {
-        List<String> keys = clientProvider.get().getKVKeysOnly(checkpointBasePath).getValue();
+        List<String> keys = clientProvider.get().getKVKeysOnly(basePathInConsul).getValue();
         if (keys != null) {
-            return keys;
+            return keys.stream()
+                    // Remove base path
+                    .map(key -> StringUtils.removeStart(key, basePathInConsul))
+                    // Remove leading slashes
+                    .map(key -> StringUtils.removeStart(key, "/"))
+                    .collect(Collectors.toList());
         }
 
-        LOG.debug("No handles present in Consul for key prefix {}", checkpointBasePath);
+        LOG.debug("No handles present in Consul for key prefix {}", basePathInConsul);
         return emptyList();
     }
 
     @Override
-    public boolean releaseAndTryRemove(String pathInConsul) throws Exception {
-        checkNotNull(pathInConsul, "Path in Consul");
+    public boolean releaseAndTryRemove(String keyName) throws Exception {
+        checkNotNull(keyName, "Name of key in Consul");
+
+        String fullConsulPathToKey = normalizePath(keyName);
+        LOG.debug("Remove state in consul key/value store {}", fullConsulPathToKey);
 
         RetrievableStateHandle<T> stateHandle = null;
         try {
-            stateHandle = get(pathInConsul);
+            stateHandle = get(fullConsulPathToKey);
         } catch (Exception e) {
-            LOG.warn("Could not retrieve the state handle from Consul {}.", pathInConsul, e);
+            LOG.warn("Could not retrieve the state handle from Consul {}.", fullConsulPathToKey, e);
         }
 
         try {
-            clientProvider.get().deleteKVValue(pathInConsul);
-            LOG.info("Value for key {} in Consul was deleted.", pathInConsul);
+            clientProvider.get().deleteKVValue(fullConsulPathToKey);
+            LOG.info("Value for key {} in Consul was deleted.", fullConsulPathToKey);
         } catch (Exception e) {
-            LOG.info("Error while deleting state handle for checkpoint {}", pathInConsul, e);
+            LOG.info("Error while deleting state handle for path {}", fullConsulPathToKey, e);
             return false;
         }
 
@@ -173,11 +193,11 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     @Override
     public void releaseAndTryRemoveAll() throws Exception {
-        Collection<String> checkpointPathsInConsul = getAllHandles();
+        Collection<String> allPathsInConsul = getAllHandles();
 
         Exception exception = null;
 
-        for (String pathInConsul : checkpointPathsInConsul) {
+        for (String pathInConsul : allPathsInConsul) {
             try {
                 releaseAndTryRemove(pathInConsul);
             } catch (Exception e) {
@@ -192,8 +212,8 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     @Override
     public void clearEntries() throws Exception {
-        Collection<String> checkpointPathsInConsul = getAllHandles();
-        for (String pathInConsul : checkpointPathsInConsul) {
+        Collection<String> allPathsInConsul = getAllHandles();
+        for (String pathInConsul : allPathsInConsul) {
             clientProvider.get().deleteKVValue(pathInConsul);
             LOG.info("Value for key {} in Consul was deleted.", pathInConsul);
         }
@@ -201,7 +221,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     @Override
     public void release(String pathInConsul) throws Exception {
-        // There is no dedicated lock for a specific checkpoint
+        // There is no dedicated lock for a specific state handle
     }
 
     @Override
@@ -219,5 +239,15 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
         } catch (IOException | ClassNotFoundException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * Makes sure that every path starts without a "/".
+     *
+     * @param path Path to normalize
+     * @return Normalized path such that it starts without a "/"
+     */
+    private static String normalizePath(String path) {
+        return StringUtils.removeStart(path, "/");
     }
 }

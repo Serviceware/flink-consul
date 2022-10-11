@@ -18,12 +18,19 @@
 
 package com.espro.flink.consul.leader;
 
-import java.util.UUID;
-
+/**
+ * Listener to inform about a leader change.
+ */
 public interface ConsulLeaderLatchListener {
 
-	void onLeadershipAcquired(String address, UUID sessionId);
+    /**
+     * Called when leadership is acquired
+     */
+    void isLeader();
 
-	void onLeadershipRevoked();
+    /**
+     * Called when current leadership is revoked
+     */
+    void notLeader();
 
 }

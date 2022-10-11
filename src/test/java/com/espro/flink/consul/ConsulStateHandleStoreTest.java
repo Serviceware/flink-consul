@@ -1,7 +1,7 @@
 /*
  * Copyright (c) SABIO GmbH, Hamburg 2021 - All rights reserved
  */
-package com.espro.flink.consul.checkpoint;
+package com.espro.flink.consul;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -32,16 +32,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.ecwid.consul.v1.ConsulClient;
-import com.espro.flink.consul.AbstractConsulTest;
+import com.espro.flink.consul.checkpoint.CheckpointTestHelper;
 
 /**
  * Tests the {@link ConsulStateHandleStore}.
  */
 public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
-    private static final String FLINK_CHECKPOINTS_PATH = "flink/checkpoints/";
+    private static final String BASE_PATH = "flink/states/";
 
-    private static final String CHECKPOINT_STORAGE_PREFIX = "cp";
+    private static final String STORAGE_PREFIX = "sp";
 
     private ConsulClient client;
     private File tempDir;
@@ -53,7 +53,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     public void setup() throws IOException {
         client = new ConsulClient(String.format("localhost:%d", consul.getHttpPort()));
         tempDir = Files.createTempDir();
-        storage = new FileSystemStateStorageHelper<>(new Path(tempDir.getPath()), CHECKPOINT_STORAGE_PREFIX);
+        storage = new FileSystemStateStorageHelper<>(new Path(tempDir.getPath()), STORAGE_PREFIX);
     }
 
     @Test
@@ -63,7 +63,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, FLINK_CHECKPOINTS_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
 
         // GIVEN checkpoint
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
@@ -82,7 +82,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, FLINK_CHECKPOINTS_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
 
         // GIVEN 10 checkpoints
         Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
@@ -94,7 +94,8 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         assertEquals(checkpoints.size(), stateHandleTuples.size());
 
         // THEN tuples for all created checkpoint are returned
-        Set<String> expectedCheckpointPaths = checkpoints.stream().map(c -> createCheckpointKey(jobID, c)).collect(Collectors.toSet());
+        Set<String> expectedCheckpointPaths = checkpoints.stream().map(c -> BASE_PATH + getCheckpointPath(jobID, c))
+                .collect(Collectors.toSet());
         for (Tuple2<RetrievableStateHandle<CompletedCheckpoint>, String> tuple : stateHandleTuples) {
             assertTrue(expectedCheckpointPaths.contains(tuple.f1));
             assertNotNull(tuple.f0);
@@ -120,7 +121,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, FLINK_CHECKPOINTS_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
 
         // GIVEN 10 checkpoints
         Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
@@ -133,7 +134,8 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
         // THEN all created checkpoint handles are returned
         for (CompletedCheckpoint completedCheckpoint : checkpoints) {
-            assertTrue(allHandles.contains(createCheckpointKey(jobID, completedCheckpoint)));
+            String expectedCheckpointHandle = getCheckpointPath(jobID, completedCheckpoint);
+            assertTrue(allHandles.contains(expectedCheckpointHandle));
         }
     }
 
@@ -156,19 +158,19 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, FLINK_CHECKPOINTS_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
 
         // GIVEN checkpoint
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
 
         // WHEN getting checkpoint by path
-        boolean success = store.releaseAndTryRemove(createCheckpointKey(jobID, checkpoint));
+        boolean success = store.releaseAndTryRemove(getCheckpointPath(jobID, checkpoint));
 
         // THEN removal was successful
         assertTrue(success);
 
         // THEN state in Consul is deleted
-        assertNull(client.getKVBinaryValue(createCheckpointKey(jobID, checkpoint)).getValue());
+        assertNull(client.getKVBinaryValue(getCheckpointPath(jobID, checkpoint)).getValue());
     }
 
     @Test
@@ -178,7 +180,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, FLINK_CHECKPOINTS_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
 
         // GIVEN 10 checkpoints
         Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
@@ -188,7 +190,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
         // THEN all states in Consul are deleted
         for (CompletedCheckpoint completedCheckpoint : checkpoints) {
-            assertNull(client.getKVBinaryValue(createCheckpointKey(jobID, completedCheckpoint)).getValue());
+            assertNull(client.getKVBinaryValue(getCheckpointPath(jobID, completedCheckpoint)).getValue());
         }
     }
 
@@ -199,7 +201,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, FLINK_CHECKPOINTS_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
 
         // GIVEN checkpoint
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
@@ -208,7 +210,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         IntegerResourceVersion resourceVersion = store.exists(createCheckpointKey(jobID, checkpoint));
 
         // THEN resource version is equal to modify index of Consul value
-        assertEquals(client.getKVBinaryValue(createCheckpointKey(jobID, checkpoint)).getValue().getModifyIndex(),
+        assertEquals(client.getKVBinaryValue(BASE_PATH + getCheckpointPath(jobID, checkpoint)).getValue().getModifyIndex(),
                 resourceVersion.getValue());
     }
 
@@ -228,7 +230,11 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         return checkpoint;
     }
 
+    private static String getCheckpointPath(JobID jobID, CompletedCheckpoint checkpoint2) {
+        return jobID.toString() + checkpoint2.getCheckpointID();
+    }
+
     private static String createCheckpointKey(JobID jobID, CompletedCheckpoint checkpoint2) {
-        return FLINK_CHECKPOINTS_PATH + jobID.toString() + checkpoint2.getCheckpointID();
+        return BASE_PATH + getCheckpointPath(jobID, checkpoint2);
     }
 }

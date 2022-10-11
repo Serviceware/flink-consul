@@ -21,6 +21,7 @@ import org.apache.flink.runtime.state.SharedStateRegistryFactory;
 import org.apache.flink.util.Preconditions;
 
 import com.ecwid.consul.v1.ConsulClient;
+import com.espro.flink.consul.ConsulStateHandleStore;
 import com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions;
 
 public final class ConsulCheckpointRecoveryFactory implements CheckpointRecoveryFactory {

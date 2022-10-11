@@ -19,10 +19,13 @@
 package com.espro.flink.consul.leader;
 
 import java.util.UUID;
-import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,16 +44,16 @@ final class ConsulLeaderLatch {
 
     private final Supplier<ConsulClient> clientProvider;
 
-	private final Executor executor;
+    private final ScheduledExecutorService executor;
 
 	private final ConsulSessionHolder sessionHolder;
 
 	private final String leaderKey;
 
 	/**
-	 * SessionID
-	 */
-	private UUID flinkSessionId;
+     * Unique identifier for this leader latch
+     */
+	private UUID leaderIdentifier;
 
 	private long leaderKeyIndex;
 
@@ -60,102 +63,103 @@ final class ConsulLeaderLatch {
 
 	private final ConsulLeaderLatchListener listener;
 
-    private final int waitTimeInSeconds;
+    private final int watchIntervalInSeconds;
+
+    private volatile ScheduledFuture<?> watchFuture;
 
 	/**
      * @param clientProvider provides a Consul client
      * @param executor Executor to run background tasks
      * @param leaderKey key in Consul KV store
      * @param nodeAddress leadership changes are reported to this contender
-     * @param waitTime Consul blocking read timeout (in seconds)
+     * @param watchIntervalInSeconds watch interval for leader election (in seconds)
      */
     public ConsulLeaderLatch(Supplier<ConsulClient> clientProvider,
-							 Executor executor,
 							 ConsulSessionHolder sessionHolder,
 							 String leaderKey,
 							 ConsulLeaderLatchListener listener,
-							 int waitTime) {
+							 int watchIntervalInSeconds) {
 		this.clientProvider = Preconditions.checkNotNull(clientProvider, "client");
-		this.executor = Preconditions.checkNotNull(executor, "executor");
+        this.executor = Executors
+                .newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setNameFormat("consulLeaderLatch-pool-%d").build());
 		this.sessionHolder = Preconditions.checkNotNull(sessionHolder, "sessionHolder");
 		this.leaderKey = Preconditions.checkNotNull(leaderKey, "leaderKey");
 		this.listener = Preconditions.checkNotNull(listener, "listener");
-        this.waitTimeInSeconds = waitTime;
+        this.watchIntervalInSeconds = watchIntervalInSeconds;
 	}
 
 	public void start() {
-		LOG.info("Starting Consul Leadership Latch");
+        leaderIdentifier = UUID.randomUUID();
+        LOG.info("Starting Consul Leadership Latch using leader identifier: {}", leaderIdentifier);
 		runnable = true;
-		executor.execute(this::watch);
+        watchFuture = executor.scheduleAtFixedRate(this::watch, 0, watchIntervalInSeconds, TimeUnit.SECONDS);
 	}
 
 	public void stop() {
 		LOG.info("Stopping Consul Leadership Latch");
 		runnable = false;
 		hasLeadership = false;
+        if (watchFuture != null) {
+            watchFuture.cancel(true);
+        }
+        releaseLeaderKey();
+        executor.shutdownNow();
 	}
 
 	private void watch() {
-		flinkSessionId = UUID.randomUUID();
-		while (runnable) {
-			try {
-				GetBinaryValue value = readLeaderKey();
-				String leaderSessionId = null;
-				if (value != null) {
-					leaderKeyIndex = value.getModifyIndex();
-					leaderSessionId = value.getSession();
-				}
+        if (!runnable) {
+            return;
+        }
 
-				if (runnable) {
-					if (leaderSessionId == null) {
-						LOG.info("No leader elected. Current node is trying to register");
-                        Boolean success = writeLeaderKey(null);
-						if (success) {
-                            leadershipAcquired(ConsulLeaderData.from(null, flinkSessionId));
-						} else {
-							leadershipRevoked();
-						}
-					}
-				}
-			} catch (Exception e) {
-				LOG.error("Exception during leadership election", e);
-				// backoff
-				try {
-                    TimeUnit.SECONDS.sleep(waitTimeInSeconds);
-				} catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
+        try {
+            GetBinaryValue value = readLeaderKey();
+            String leaderSessionId = null;
+            if (value != null) {
+                leaderKeyIndex = value.getModifyIndex();
+                leaderSessionId = value.getSession();
+            }
+
+            if (runnable && leaderSessionId == null) {
+                LOG.info("No leader elected. Current node is trying to register");
+                boolean success = writeLeaderKey();
+                if (success) {
+                    leadershipAcquired();
+                } else {
+                    leadershipRevoked();
 				}
 			}
+        } catch (Exception e) {
+            LOG.warn("Exception during leadership election", e);
 		}
-		releaseLeaderKey();
 	}
 
-    UUID getFlinkSessionId() {
-        return flinkSessionId;
+    UUID getLeaderIdentifier() {
+        return leaderIdentifier;
     }
 
-    public boolean hasLeadership(UUID leaderSessionId) {
-        return hasLeadership && flinkSessionId.equals(leaderSessionId);
+    public boolean hasLeadership() {
+        return hasLeadership;
 	}
 
 	private GetBinaryValue readLeaderKey() {
-		QueryParams queryParams = QueryParams.Builder.builder()
-			.setIndex(leaderKeyIndex)
-                .setWaitTime(waitTimeInSeconds)
-			.build();
+        QueryParams queryParams = QueryParams.Builder.builder()
+                .setIndex(leaderKeyIndex)
+                .setWaitTime(watchIntervalInSeconds)
+                .build();
         Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
 		return leaderKeyValue.getValue();
 	}
 
-    private boolean writeLeaderKey(String nodeAddress) {
+    private boolean writeLeaderKey() {
 		PutParams putParams = new PutParams();
 		putParams.setAcquireSession(sessionHolder.getSessionId());
 		try {
-            ConsulLeaderData data = new ConsulLeaderData(nodeAddress, flinkSessionId);
+            ConsulLeaderData data = ConsulLeaderData.from(leaderIdentifier);
             Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
-            return response != null ? response : false;
+            return response != null && response;
 		} catch (OperationException ex) {
-            LOG.error("Error while writing leader key for {} with session id {} to Consul.", nodeAddress, flinkSessionId);
+            LOG.error("Error while writing leader identifier {} to Consul {}.", leaderIdentifier, leaderKey, ex);
+            LOG.debug("Details:", ex);
 			return false;
 		}
 	}
@@ -166,47 +170,25 @@ final class ConsulLeaderLatch {
 		try {
             return clientProvider.get().setKVBinaryValue(leaderKey, new byte[0], putParams).getValue();
 		} catch (OperationException ex) {
-            LOG.error("Error while releasing leader key for session {}.", sessionHolder.getSessionId());
+            LOG.error("Error while releasing leader identifier {} for consul session {}.", leaderIdentifier, sessionHolder.getSessionId(),
+                    ex);
 			return false;
 		}
 	}
 
-	private void leadershipAcquired(ConsulLeaderData data) {
+    private void leadershipAcquired() {
 		if (!hasLeadership) {
 			hasLeadership = true;
-			notifyOnLeadershipAcquired(data);
-            LOG.info("Cluster leadership has been acquired by current node {}", data.getAddress());
+            listener.isLeader();
+            LOG.info("Cluster leadership has been acquired from current node with leader identifier {}", leaderIdentifier);
 		}
 	}
 
 	private void leadershipRevoked() {
 		if (hasLeadership) {
 			hasLeadership = false;
-			notifyOnLeadershipRevoked();
-			LOG.info("Cluster leadership has been revoked from current node");
+            listener.notLeader();
+            LOG.info("Cluster leadership has been revoked from current node with leader identifier {}", leaderIdentifier);
 		}
 	}
-
-	private void notifyOnLeadershipAcquired(ConsulLeaderData data) {
-		try {
-            listener.onLeadershipAcquired(data.getAddress(), data.getSessionId());
-		} catch (Exception e) {
-			LOG.error("Listener failed on leadership acquired notification", e);
-		}
-	}
-
-	private void notifyOnLeadershipRevoked() {
-		try {
-			listener.onLeadershipRevoked();
-		} catch (Exception e) {
-			LOG.error("Listener failed on leadership revoked notification", e);
-		}
-	}
-
-    public void confirmLeadership(UUID leaderSessionID, String leaderAddress) {
-        if (hasLeadership(leaderSessionID)) {
-            writeLeaderKey(leaderAddress);
-        }
-    }
-
 }
