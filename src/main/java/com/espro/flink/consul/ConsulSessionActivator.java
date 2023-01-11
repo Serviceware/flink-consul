@@ -1,11 +1,14 @@
 package com.espro.flink.consul;
 
+import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_SESSION_TTL;
+
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,10 +37,10 @@ public final class ConsulSessionActivator {
      * @param executor runs session keep-alive background task
      * @param sessionTtl session ttl in seconds
      */
-    public ConsulSessionActivator(Supplier<ConsulClient> clientProvider, int sessionTtl) {
+    public ConsulSessionActivator(Supplier<ConsulClient> clientProvider, Configuration configuration) {
         this.clientProvider = Preconditions.checkNotNull(clientProvider, "client");
         this.executorService = Executors.newSingleThreadScheduledExecutor();
-        this.sessionTtl = Duration.ofSeconds(sessionTtl);
+        this.sessionTtl = Duration.ofSeconds(configuration.getInteger(HA_CONSUL_SESSION_TTL));
 	}
 
 	public ConsulSessionHolder start() {
@@ -66,11 +69,17 @@ public final class ConsulSessionActivator {
 	private void doRun() {
         if (running) {
             createOrRenewConsulSession();
-
-            // Consul session is renewed after 90% of the ttl is passed
-            executorService.schedule(this::doRun, (long) (sessionTtl.toMillis() * 0.8), TimeUnit.MILLISECONDS);
         }
 	}
+
+    private void scheduleRenewalOfSession() {
+        // Consul session is renewed after 80% of the ttl is passed
+        executorService.schedule(this::doRun, (long) (sessionTtl.toMillis() * 0.8), TimeUnit.MILLISECONDS);
+    }
+
+    private void scheduleCreationOfSession() {
+        executorService.schedule(this::doRun, 100, TimeUnit.MILLISECONDS);
+    }
 
 	private void createOrRenewConsulSession() {
 		if (holder.getSessionId() == null) {
@@ -81,21 +90,29 @@ public final class ConsulSessionActivator {
 	}
 
 	private void createConsulSession() {
-		NewSession newSession = new NewSession();
-		newSession.setName("flink");
-        newSession.setTtl(String.format("%ds", Math.max(10, sessionTtl.toMillis() / 1000)));
-        holder.setSessionId(clientProvider.get().sessionCreate(newSession, QueryParams.DEFAULT).getValue());
-        Log.info("New consul session is created {}", holder.getSessionId());
+        try {
+            NewSession newSession = new NewSession();
+            newSession.setName("flink");
+            newSession.setTtl(String.format("%ds", Math.max(10, sessionTtl.toMillis() / 1000)));
+            holder.setSessionId(clientProvider.get().sessionCreate(newSession, QueryParams.DEFAULT).getValue());
+            Log.info("New consul session is created {}", holder.getSessionId());
+            scheduleRenewalOfSession();
+        } catch (Exception e) {
+            LOG.error("Error while creating new consul session", e);
+            scheduleCreationOfSession();
+        }
 	}
 
 	private void renewConsulSession() {
 		try {
             clientProvider.get().renewSession(holder.getSessionId(), QueryParams.DEFAULT);
+            scheduleRenewalOfSession();
         } catch (OperationException e) {
             LOG.warn("Consul session renew failed, a new session is created.", e);
             createConsulSession();
         } catch (Exception e) {
 			LOG.error("Consul session renew failed", e);
+            scheduleCreationOfSession();
 		}
 	}
 

@@ -65,6 +65,13 @@ public final class ConsulHighAvailabilityOptions {
             .defaultValue(8550);
 
     /**
+     * Defines the consul session ttl in seconds.
+     */
+    public static final ConfigOption<Integer> HA_CONSUL_SESSION_TTL = key("high-availability.consul.session.ttl")
+            .intType()
+            .defaultValue(10);
+
+    /**
      * Enables the use of tls secured connections to consul.
      */
     public static final ConfigOption<Boolean> HA_CONSUL_TLS_ENABLED = key("high-availability.consul.tls.enabled")

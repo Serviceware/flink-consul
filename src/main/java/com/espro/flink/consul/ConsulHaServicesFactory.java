@@ -36,11 +36,8 @@ public class ConsulHaServicesFactory implements HighAvailabilityServicesFactory 
 
         Supplier<ConsulClient> clientProvider = () -> ConsulClientFactory.createConsulClient(configuration);
 
-        ConsulSessionActivator consulSessionActivator = new ConsulSessionActivator(clientProvider, 10);
+        ConsulSessionActivator consulSessionActivator = new ConsulSessionActivator(clientProvider, configuration);
         consulSessionActivator.start();
-        // ConsulRunningJobsRegistry consulJobResultStore = new ConsulRunningJobsRegistry(clientProvider,
-        // consulSessionActivator.getHolder(),
-        // jobStatusPathFromConfiguration(configuration));
 
         return new ConsulHaServices(executor, configuration, blobStoreService, clientProvider, consulSessionActivator);
     }
