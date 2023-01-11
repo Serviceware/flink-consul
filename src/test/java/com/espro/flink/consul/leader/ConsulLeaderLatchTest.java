@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.flink.configuration.Configuration;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,9 +47,9 @@ public class ConsulLeaderLatchTest extends AbstractConsulTest {
 	@Before
 	public void setup() {
 		client = new ConsulClient(String.format("localhost:%d", consul.getHttpPort()));
-        sessionActivator1 = new ConsulSessionActivator(() -> client, 10);
+        sessionActivator1 = new ConsulSessionActivator(() -> client, new Configuration());
 		sessionHolder1 = sessionActivator1.start();
-        sessionActivator2 = new ConsulSessionActivator(() -> client, 10);
+        sessionActivator2 = new ConsulSessionActivator(() -> client, new Configuration());
 		sessionHolder2 = sessionActivator2.start();
 	}
 

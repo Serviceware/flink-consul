@@ -7,6 +7,7 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import org.apache.flink.configuration.Configuration;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -26,7 +27,7 @@ public class ConsulSessionActivatorTest extends AbstractConsulTest {
 	@Test
 	public void testSessionLifecycle() throws Exception {
 		ConsulClient spiedClient = spy(client);
-        ConsulSessionActivator cse = new ConsulSessionActivator(() -> spiedClient, 10);
+        ConsulSessionActivator cse = new ConsulSessionActivator(() -> spiedClient, new Configuration());
 		ConsulSessionHolder holder = cse.start();
 		Thread.sleep(1000);
 
