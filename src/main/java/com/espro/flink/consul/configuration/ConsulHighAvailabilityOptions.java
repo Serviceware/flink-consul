@@ -117,6 +117,15 @@ public final class ConsulHighAvailabilityOptions {
             .stringType()
             .defaultValue("PKCS12");
 
+    /**
+     * Defines the algorithm that is used for the ssl context.
+     *
+     * @see https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#SSLContext
+     */
+    public static final ConfigOption<String> HA_CONSUL_TLS_ALGORITHM = key("high-availability.consul.tls.algorithm")
+            .stringType()
+            .defaultValue("TLS");
+
     private ConsulHighAvailabilityOptions() {
         // class for holding constants
     }

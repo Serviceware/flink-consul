@@ -38,6 +38,7 @@ In order to start an HA-cluster with flink-consul add the following configuratio
 | Property                                         | Default          | Description     |
 | ------------------------------------------------ | ---------------- | ----------------|
 | high-availability.consul.tls.enabled             | false            | To enabled tls secured http communication |
+| high-availability.consul.tls.algorithm           | TLS              | Algorithm used for creating ssl context |
 | high-availability.consul.tls.keystore.path       | none             | Path to the keystore file, e.g. file:/path/to/keystore/consul.p12
 | high-availability.consul.tls.keystore.password   | none             | The password to use to read the keystore
 | high-availability.consul.tls.keystore.type       | PKCS12           | Type of the keystore

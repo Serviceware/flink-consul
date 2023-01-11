@@ -1,9 +1,8 @@
 package com.espro.flink.consul;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_HOST;
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_PORT;
+import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_ALGORITHM;
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_ENABLED;
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_KEYSTORE_PASSWORD;
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_KEYSTORE_PATH;
@@ -11,6 +10,7 @@ import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_TRUSTSTORE_PASSWORD;
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_TRUSTSTORE_PATH;
 import static com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions.HA_CONSUL_TLS_TRUSTSTORE_TYPE;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import java.io.IOException;
 import java.net.URL;
@@ -75,12 +75,15 @@ final class ConsulClientFactory {
         String trustStorePassword = configuration.getString(HA_CONSUL_TLS_TRUSTSTORE_PASSWORD);
         String trustStoreType = checkNotNull(configuration.getString(HA_CONSUL_TLS_TRUSTSTORE_TYPE), "No truststore type given!");
 
+        String protocol = configuration.getString(HA_CONSUL_TLS_ALGORITHM);
+
         try {
             char[] keyStorePasswordCharArray = keyStorePassword != null ? keyStorePassword.toCharArray() : null;
             char[] trustStorePasswordCharArray = trustStorePassword != null ? trustStorePassword.toCharArray() : null;
 
             // Build ssl context using configured keystore and truststore
             SSLContext sslContext = SSLContexts.custom()
+                    .setProtocol(protocol)
                     .setSecureRandom(new SecureRandom())
                     .setKeyStoreType(keyStoreType)
                     .loadKeyMaterial(new URL(keyStorePath), keyStorePasswordCharArray, keyStorePasswordCharArray)
