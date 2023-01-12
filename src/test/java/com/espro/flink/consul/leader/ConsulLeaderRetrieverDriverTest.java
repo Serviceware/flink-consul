@@ -1,14 +1,13 @@
 package com.espro.flink.consul.leader;
 
+import static com.espro.flink.consul.ConsulUtils.generateConnectionInformationPath;
+import static com.espro.flink.consul.ConsulUtils.leaderInformationToBytes;
 import static org.apache.flink.runtime.leaderelection.LeaderInformation.empty;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-
-import static com.espro.flink.consul.ConsulUtils.generateConnectionInformationPath;
-import static com.espro.flink.consul.ConsulUtils.leaderInformationToBytes;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -45,7 +44,7 @@ public class ConsulLeaderRetrieverDriverTest extends AbstractConsulTest {
         leaderRetrievalEventHandler = Mockito.mock(LeaderRetrievalEventHandler.class);
         fatalErrorHandler = Mockito.mock(FatalErrorHandler.class);
 
-        client = new ConsulClient(String.format("localhost:%d", consul.getHttpPort()));
+        client = new ConsulClient("localhost", consul.getHttpPort());
 
         consulLeaderRetrieverDriver = new ConsulLeaderRetrieverDriver(() -> client, CONSUL_KV_PATH, leaderRetrievalEventHandler,
                 fatalErrorHandler, 2);

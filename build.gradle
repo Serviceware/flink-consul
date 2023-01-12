@@ -20,7 +20,7 @@ configurations {
 
 dependencies {
     implementation 'com.ecwid.consul:consul-api:1.4.5'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.5'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
     implementation 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.9'
     implementation "org.apache.flink:flink-runtime:$flinkVersion"
 
@@ -37,9 +37,5 @@ dependencies {
 shadowJar {
     configurations = [project.configurations.shadow]
     classifier = ''
-    dependencies {
-        exclude(dependency{
-            it.moduleGroup.startsWith('org.apache') || it.moduleGroup.startsWith('org.slf4j') || it.moduleGroup.startsWith('commons') || it.moduleGroup.startsWith('com.google') 
-        })
-    }
+    relocate 'org', 'shadow.consul.org'
 }

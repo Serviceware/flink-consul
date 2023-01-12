@@ -51,7 +51,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
     @Before
     public void setup() throws IOException {
-        client = new ConsulClient(String.format("localhost:%d", consul.getHttpPort()));
+        client = new ConsulClient("localhost", consul.getHttpPort());
         tempDir = Files.createTempDir();
         storage = new FileSystemStateStorageHelper<>(new Path(tempDir.getPath()), STORAGE_PREFIX);
     }
