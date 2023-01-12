@@ -3,14 +3,14 @@ plugins {
 }
 
 group 'com.espro.flink'
-version '1.9.3-sw'
+version '1.10.0-sw'
 
 apply plugin: 'java'
 
 def flinkVersion = "1.16.0"
 
 repositories {
-    mavenLocal()
+    //mavenLocal()
     mavenCentral()
 }
 
@@ -19,18 +19,19 @@ configurations {
 }
 
 dependencies {
-    compile 'com.ecwid.consul:consul-api:1.4.5'
-    compile 'org.apache.httpcomponents:httpclient:4.5.5'
-    compile "org.apache.flink:flink-runtime:$flinkVersion"
+    implementation 'com.ecwid.consul:consul-api:1.4.5'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.5'
+    implementation 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.9'
+    implementation "org.apache.flink:flink-runtime:$flinkVersion"
 
-    testCompile "junit:junit:4.12"
-    testCompile "org.mockito:mockito-core:1.10.19"
-    testCompile 'com.pszymczyk.consul:embedded-consul:2.1.4'
-    testCompile 'org.awaitility:awaitility:4.0.3'
-    testCompile "org.apache.flink:flink-runtime:$flinkVersion"
-    testCompile "org.apache.flink:flink-test-utils:$flinkVersion"
+    testImplementation "junit:junit:4.12"
+    testImplementation "org.mockito:mockito-core:1.10.19"
+    testImplementation 'com.pszymczyk.consul:embedded-consul:2.1.4'
+    testImplementation 'org.awaitility:awaitility:4.0.3'
+    testImplementation "org.apache.flink:flink-test-utils:$flinkVersion"
 
     shadow 'com.ecwid.consul:consul-api:1.4.5'
+    shadow 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.9'
 }
 
 shadowJar {
