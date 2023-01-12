@@ -77,6 +77,10 @@ final class ConsulClientFactory {
 
         String protocol = configuration.getString(HA_CONSUL_TLS_ALGORITHM);
 
+        Integer connectTimeout = configuration.getInteger(ConsulHighAvailabilityOptions.HA_CONSUL_CLIENT_CONNECT_TIMEOUT);
+        Integer connectionRequestTimeout = configuration.getInteger(ConsulHighAvailabilityOptions.HA_CONSUL_CLIENT_CONNECTION_REQUEST_TIMEOUT);
+        Integer socketTimeout = configuration.getInteger(ConsulHighAvailabilityOptions.HA_CONSUL_CLIENT_SOCKET_TIMEOUT);
+
         try {
             char[] keyStorePasswordCharArray = keyStorePassword != null ? keyStorePassword.toCharArray() : null;
             char[] trustStorePasswordCharArray = trustStorePassword != null ? trustStorePassword.toCharArray() : null;
@@ -102,9 +106,9 @@ final class ConsulClientFactory {
 
             // Took timeout settings from AbstractHttpTransport
             RequestConfig requestConfig = RequestConfig.custom()
-                    .setConnectTimeout((int) TimeUnit.SECONDS.toMillis(10))
-                    .setConnectionRequestTimeout((int) TimeUnit.SECONDS.toMillis(10))
-                    .setSocketTimeout((int) TimeUnit.MINUTES.toMillis(10))
+                    .setConnectTimeout((int) TimeUnit.SECONDS.toMillis(connectTimeout))
+                    .setConnectionRequestTimeout((int) TimeUnit.SECONDS.toMillis(connectionRequestTimeout))
+                    .setSocketTimeout((int) TimeUnit.SECONDS.toMillis(socketTimeout))
                     .build();
 
             HttpClientBuilder httpClientBuilder = HttpClientBuilder.create()

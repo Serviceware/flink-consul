@@ -133,6 +133,27 @@ public final class ConsulHighAvailabilityOptions {
             .stringType()
             .defaultValue("TLS");
 
+    /**
+     * Read timeout in seconds
+     */
+    public static final ConfigOption<Integer> HA_CONSUL_CLIENT_CONNECT_TIMEOUT = key("high-availability.consul.client.connect-timeout")
+            .intType()
+            .defaultValue(10);
+
+    /**
+     * Connection request timeout in seconds
+     */
+    public static final ConfigOption<Integer> HA_CONSUL_CLIENT_CONNECTION_REQUEST_TIMEOUT = key("high-availability.consul.client.connection-request-timeout")
+            .intType()
+            .defaultValue(10);
+
+    /**
+     * Socket timeout in seconds
+     */
+    public static final ConfigOption<Integer> HA_CONSUL_CLIENT_SOCKET_TIMEOUT = key("high-availability.consul.client.socket-timeout")
+            .intType()
+            .defaultValue(30);
+
     private ConsulHighAvailabilityOptions() {
         // class for holding constants
     }

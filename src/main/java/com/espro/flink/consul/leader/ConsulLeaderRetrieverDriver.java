@@ -42,13 +42,13 @@ import com.ecwid.consul.v1.kv.model.GetBinaryValue;
 import com.espro.flink.consul.ConsulUtils;
 
 /**
- * The counterpart to the {@link ConsulLeaderElectionDriver}. {@link LeaderRetrievalService} implementation for Consul. It retrieves the
- * current leader which has been elected by the {@link ConsulLeaderElectionDriver}. The leader address as well as the current leader session
- * ID is retrieved from ZooKeeper.
+ * The counterpart to the {@link ConsulLeaderElectionDriver}. {@link LeaderRetrievalService} implementation for Consul.
+ * It retrieves the current leader which has been elected by the {@link ConsulLeaderElectionDriver}. The leader address
+ * as well as the current leader session ID is retrieved from ZooKeeper.
  */
 final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
 
-	private static final Logger LOG = LoggerFactory.getLogger(ConsulLeaderRetrieverDriver.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ConsulLeaderRetrieverDriver.class);
 
     private final Supplier<ConsulClient> clientProvider;
 
@@ -56,41 +56,41 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
 
     private final String connectionInformationPath;
 
-	private volatile boolean runnable;
+    private volatile boolean runnable;
 
     private final LeaderRetrievalEventHandler leaderRetrievalEventHandler;
 
     private final FatalErrorHandler fatalErrorHandler;
 
-	private final int waitTime;
+    private final int waitTime;
 
     private volatile ScheduledFuture<?> watchFuture;
 
-	/**
+    /**
      * @param clientProvider provides a Consul client
      * @param executor Executor to run background tasks
      * @param path Path of the Consul K/V store which contains the leader information
      * @param waitTime Consul blocking read timeout (in seconds)
      */
     public ConsulLeaderRetrieverDriver(Supplier<ConsulClient> clientProvider,
-                                       String path,
-                                       LeaderRetrievalEventHandler leaderRetrievalEventHandler,
-                                       FatalErrorHandler fatalErrorHandler,
-    								   int waitTime) {
+            String path,
+            LeaderRetrievalEventHandler leaderRetrievalEventHandler,
+            FatalErrorHandler fatalErrorHandler,
+            int waitTime) {
         this.clientProvider = Preconditions.checkNotNull(clientProvider, "client");
         this.executor = Executors
                 .newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setNameFormat("consulLeaderRetrieval-pool-%d").build());
         this.connectionInformationPath = ConsulUtils.generateConnectionInformationPath(Preconditions.checkNotNull(path, "path"));
         this.leaderRetrievalEventHandler = Preconditions.checkNotNull(leaderRetrievalEventHandler, "leaderRetrievalEventHandler");
         this.fatalErrorHandler = Preconditions.checkNotNull(fatalErrorHandler, "fatalErrorHandler");
-		this.waitTime = waitTime;
-	}
+        this.waitTime = waitTime;
+    }
 
-	public void start() {
-		LOG.info("Starting Consul Leader Retriever");
-		runnable = true;
+    public void start() {
+        LOG.info("Starting Consul Leader Retriever");
+        runnable = true;
         watchFuture = executor.scheduleAtFixedRate(this::watch, 0, 5, TimeUnit.SECONDS);
-	}
+    }
 
     @Override
     public void close() throws Exception {
@@ -102,7 +102,7 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
         executor.shutdownNow();
     }
 
-	private void watch() {
+    private void watch() {
         if (!runnable) {
             return;
         }
@@ -125,13 +125,13 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
         } catch (Exception exception) {
             fatalErrorHandler.onFatalError(exception);
             ExceptionUtils.checkInterrupted(exception);
-		}
-	}
+        }
+    }
 
     private GetBinaryValue readConnectionInformation() {
-		QueryParams queryParams = QueryParams.Builder.builder()
-			.setWaitTime(waitTime)
-			.build();
+        QueryParams queryParams = QueryParams.Builder.builder()
+                .setWaitTime(waitTime)
+                .build();
         try {
             Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(connectionInformationPath, queryParams);
             return leaderKeyValue.getValue();
@@ -139,21 +139,21 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
             LOG.warn("Error while reading the connection information", e);
             return null;
         }
-	}
+    }
 
     private void leaderRetrieved(LeaderInformation leaderInformation) {
         notifyOnLeaderRetrieved(leaderInformation);
         LOG.debug("Cluster leader retrieved {}", leaderInformation);
-	}
+    }
 
     private void notifyOnLeaderRetrieved(LeaderInformation leaderInformation) {
-		try {
+        try {
             leaderRetrievalEventHandler.notifyLeaderAddress(leaderInformation);
-		} catch (Exception e) {
-			LOG.error("Listener failed on leader retrieved notification", e);
+        } catch (Exception e) {
+            LOG.error("Listener failed on leader retrieved notification", e);
             ExceptionUtils.checkInterrupted(e);
-		}
-	}
+        }
+    }
 
     private void notifyNoLeader() {
         leaderRetrievalEventHandler.notifyLeaderAddress(LeaderInformation.empty());

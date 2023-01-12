@@ -45,3 +45,7 @@ In order to start an HA-cluster with flink-consul add the following configuratio
 | high-availability.consul.tls.truststore.path     | none             | Path to the truststore file, e.g. file:/path/to/truststore/consul-ca.p12
 | high-availability.consul.tls.truststore.password | none             | The password to use to read the truststore
 | high-availability.consul.tls.truststore.type     | PKCS12           | Type of the truststore
+| high-availability.consul.session.ttl             | 10               | Consul session ttl in seconds
+| high-availability.consul.client.connect-timeout  | 10               | Connect timeout for the consul client in seconds |
+| high-availability.consul.client.connection-request-timeout          | 10              | connection request timeout for the consul client in seconds |
+| high-availability.consul.client.socket-timeout   | 30               | socket timeout for the consul client in seconds |
