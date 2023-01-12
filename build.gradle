@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
+
 plugins {
     id "com.github.johnrengelman.shadow" version "6.1.0"
 }
@@ -37,5 +39,12 @@ dependencies {
 shadowJar {
     configurations = [project.configurations.shadow]
     classifier = ''
-    relocate 'org', 'shadow.consul.org'
 }
+
+task relocateShadowJar(type: ConfigureShadowRelocation) {
+    target = tasks.shadowJar
+    prefix = "shadow.consul"
+
+}
+
+tasks.shadowJar.dependsOn tasks.relocateShadowJar
