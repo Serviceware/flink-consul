@@ -17,6 +17,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -95,8 +97,8 @@ public class ConsulClientProvider implements Supplier<ConsulClient>, Closeable {
         char[] trustStorePasswordCharArray = trustStorePassword != null ? trustStorePassword.toCharArray() : null;
 
         return SSLFactory.builder()
-                .withIdentityMaterial(keyStorePath, keyStorePasswordCharArray, trustStorePasswordCharArray, keyStoreType)
-                .withTrustMaterial(trustStorePath, trustStorePasswordCharArray, trustStoreType)
+                .withIdentityMaterial(Paths.get(URI.create(keyStorePath)), keyStorePasswordCharArray, trustStorePasswordCharArray, keyStoreType)
+                .withTrustMaterial(Paths.get(URI.create(trustStorePath)), trustStorePasswordCharArray, trustStoreType)
                 .withSslContextAlgorithm(protocol)
                 .withSecureRandom(new SecureRandom())
                 .withSwappableIdentityMaterial()
