@@ -37,4 +37,9 @@ dependencies {
 shadowJar {
     configurations = [project.configurations.shadow]
     classifier = ''
+    dependencies {
+        exclude(dependency{
+            it.moduleGroup.startsWith('org.apache') || it.moduleGroup.startsWith('org.slf4j') || it.moduleGroup.startsWith('commons') || it.moduleGroup.startsWith('com.google') 
+        })
+    }
 }
