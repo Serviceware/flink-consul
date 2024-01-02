@@ -43,7 +43,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
     private static final String STORAGE_PREFIX = "sp";
 
-    private ConsulClient client;
+    private ConsulClientProvider clientProviderImpl;
     private File tempDir;
     private RetrievableStateStorageHelper<CompletedCheckpoint> storage;
 
@@ -51,7 +51,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
     @Before
     public void setup() throws IOException {
-        client = new ConsulClient("localhost", consul.getHttpPort());
+        clientProviderImpl = new ConsulClientProviderImpl(new ConsulClient("localhost", consul.getHttpPort()));
         tempDir = Files.createTempDir();
         storage = new FileSystemStateStorageHelper<>(new Path(tempDir.getPath()), STORAGE_PREFIX);
     }
@@ -63,7 +63,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
 
         // GIVEN checkpoint
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
@@ -82,7 +82,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
 
         // GIVEN 10 checkpoints
         Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
@@ -105,7 +105,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testGetAllAndLock_NoHandlesPresent() throws Exception {
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, "foo");
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, "foo");
 
         // WHEN getting all state handle tuples from ConsulStateHandleStore
         List<Tuple2<RetrievableStateHandle<CompletedCheckpoint>, String>> stateHandleTuples = store.getAllAndLock();
@@ -121,7 +121,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
 
         // GIVEN 10 checkpoints
         Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
@@ -142,7 +142,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     @Test
     public void testGetAllHandles_NoHandlesPresent() throws Exception {
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, "foo");
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, "foo");
 
         // WHEN getting all handles from ConsulStateHandleStore
         Collection<String> allHandles = store.getAllHandles();
@@ -158,7 +158,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
 
         // GIVEN checkpoint
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
@@ -170,7 +170,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         assertTrue(success);
 
         // THEN state in Consul is deleted
-        assertNull(client.getKVBinaryValue(getCheckpointPath(jobID, checkpoint)).getValue());
+        assertNull(clientProviderImpl.get().getKVBinaryValue(getCheckpointPath(jobID, checkpoint)).getValue());
     }
 
     @Test
@@ -180,7 +180,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
 
         // GIVEN 10 checkpoints
         Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
@@ -190,7 +190,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
 
         // THEN all states in Consul are deleted
         for (CompletedCheckpoint completedCheckpoint : checkpoints) {
-            assertNull(client.getKVBinaryValue(getCheckpointPath(jobID, completedCheckpoint)).getValue());
+            assertNull(clientProviderImpl.get().getKVBinaryValue(getCheckpointPath(jobID, completedCheckpoint)).getValue());
         }
     }
 
@@ -201,7 +201,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         JobID jobID = JobID.generate();
 
         // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(() -> client, storage, BASE_PATH);
+        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
 
         // GIVEN checkpoint
         CompletedCheckpoint checkpoint = addCheckpoint(sharedStateRegistry, jobID, store);
@@ -210,7 +210,7 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
         IntegerResourceVersion resourceVersion = store.exists(createCheckpointKey(jobID, checkpoint));
 
         // THEN resource version is equal to modify index of Consul value
-        assertEquals(client.getKVBinaryValue(BASE_PATH + getCheckpointPath(jobID, checkpoint)).getValue().getModifyIndex(),
+        assertEquals(clientProviderImpl.get().getKVBinaryValue(BASE_PATH + getCheckpointPath(jobID, checkpoint)).getValue().getModifyIndex(),
                 resourceVersion.getValue());
     }
 

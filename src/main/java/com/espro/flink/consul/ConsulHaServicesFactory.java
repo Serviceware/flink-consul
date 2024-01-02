@@ -31,7 +31,7 @@ public class ConsulHaServicesFactory implements HighAvailabilityServicesFactory 
     public HighAvailabilityServices createHAServices(Configuration configuration, Executor executor) throws Exception {
         BlobStoreService blobStoreService = BlobUtils.createBlobStoreFromConfig(configuration);
 
-        ConsulClientProvider consulClientProvider = new ConsulClientProvider(configuration);
+        ConsulClientProvider consulClientProvider = new ConsulClientProviderImpl(configuration);
         consulClientProvider.init();
 
         ConsulSessionActivator consulSessionActivator = new ConsulSessionActivator(consulClientProvider, configuration);

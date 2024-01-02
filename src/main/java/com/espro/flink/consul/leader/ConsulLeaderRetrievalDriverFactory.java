@@ -3,24 +3,22 @@
  */
 package com.espro.flink.consul.leader;
 
-import java.util.function.Supplier;
-
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalDriver;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalDriverFactory;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalEventHandler;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 
-import com.ecwid.consul.v1.ConsulClient;
+import com.espro.flink.consul.ConsulClientProvider;
 
 /**
  * {@link LeaderRetrievalDriverFactory} implementation for Consul.
  */
 public class ConsulLeaderRetrievalDriverFactory implements LeaderRetrievalDriverFactory {
 
-    private final Supplier<ConsulClient> clientProvider;
+    private final ConsulClientProvider clientProvider;
     private final String leaderKey;
 
-    public ConsulLeaderRetrievalDriverFactory(Supplier<ConsulClient> clientProvider, String leaderKey) {
+    public ConsulLeaderRetrievalDriverFactory(ConsulClientProvider clientProvider, String leaderKey) {
         this.clientProvider = clientProvider;
         this.leaderKey = leaderKey;
     }

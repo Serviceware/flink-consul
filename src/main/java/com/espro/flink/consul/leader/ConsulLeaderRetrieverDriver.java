@@ -22,7 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.apache.flink.runtime.leaderelection.LeaderInformation;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalDriver;
@@ -35,10 +34,10 @@ import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
 import com.ecwid.consul.v1.kv.model.GetBinaryValue;
+import com.espro.flink.consul.ConsulClientProvider;
 import com.espro.flink.consul.ConsulUtils;
 
 /**
@@ -50,7 +49,7 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConsulLeaderRetrieverDriver.class);
 
-    private final Supplier<ConsulClient> clientProvider;
+    private final ConsulClientProvider clientProvider;
 
     private final ScheduledExecutorService executor;
 
@@ -72,7 +71,7 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
      * @param path Path of the Consul K/V store which contains the leader information
      * @param waitTime Consul blocking read timeout (in seconds)
      */
-    public ConsulLeaderRetrieverDriver(Supplier<ConsulClient> clientProvider,
+    public ConsulLeaderRetrieverDriver(ConsulClientProvider clientProvider,
             String path,
             LeaderRetrievalEventHandler leaderRetrievalEventHandler,
             FatalErrorHandler fatalErrorHandler,
@@ -133,7 +132,8 @@ final class ConsulLeaderRetrieverDriver implements LeaderRetrievalDriver {
                 .setWaitTime(waitTime)
                 .build();
         try {
-            Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(connectionInformationPath, queryParams);
+            Response<GetBinaryValue> leaderKeyValue = clientProvider
+                    .executeWithSslRecovery(consulClient -> consulClient.getKVBinaryValue(connectionInformationPath, queryParams));
             return leaderKeyValue.getValue();
         } catch (Exception e) {
             LOG.warn("Error while reading the connection information", e);

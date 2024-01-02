@@ -23,26 +23,25 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.OperationException;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
 import com.ecwid.consul.v1.kv.model.GetBinaryValue;
 import com.ecwid.consul.v1.kv.model.PutParams;
+import com.espro.flink.consul.ConsulClientProvider;
 import com.espro.flink.consul.ConsulSessionHolder;
 
 final class ConsulLeaderLatch {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ConsulLeaderLatch.class);
 
-    private final Supplier<ConsulClient> clientProvider;
+    private final ConsulClientProvider clientProvider;
 
     private final ScheduledExecutorService executor;
 
@@ -74,7 +73,7 @@ final class ConsulLeaderLatch {
      * @param nodeAddress leadership changes are reported to this contender
      * @param watchIntervalInSeconds watch interval for leader election (in seconds)
      */
-    public ConsulLeaderLatch(Supplier<ConsulClient> clientProvider,
+    public ConsulLeaderLatch(ConsulClientProvider clientProvider,
 							 ConsulSessionHolder sessionHolder,
 							 String leaderKey,
 							 ConsulLeaderLatchListener listener,
@@ -146,7 +145,7 @@ final class ConsulLeaderLatch {
                 .setIndex(leaderKeyIndex)
                 .setWaitTime(watchIntervalInSeconds)
                 .build();
-        Response<GetBinaryValue> leaderKeyValue = clientProvider.get().getKVBinaryValue(leaderKey, queryParams);
+        Response<GetBinaryValue> leaderKeyValue = clientProvider.executeWithSslRecovery(consulClient -> consulClient.getKVBinaryValue(leaderKey, queryParams));
 		return leaderKeyValue.getValue();
 	}
 
@@ -155,7 +154,8 @@ final class ConsulLeaderLatch {
 		putParams.setAcquireSession(sessionHolder.getSessionId());
 		try {
             ConsulLeaderData data = ConsulLeaderData.from(leaderIdentifier);
-            Boolean response = clientProvider.get().setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue();
+            Boolean response = clientProvider
+                    .executeWithSslRecovery(consulClient -> consulClient.setKVBinaryValue(leaderKey, data.toBytes(), putParams).getValue());
             return response != null && response;
 		} catch (OperationException ex) {
             LOG.error("Error while writing leader identifier {} to Consul {}.", leaderIdentifier, leaderKey, ex);
@@ -168,7 +168,7 @@ final class ConsulLeaderLatch {
 		PutParams putParams = new PutParams();
 		putParams.setReleaseSession(sessionHolder.getSessionId());
 		try {
-            return clientProvider.get().setKVBinaryValue(leaderKey, new byte[0], putParams).getValue();
+            return clientProvider.executeWithSslRecovery(consulClient -> consulClient.setKVBinaryValue(leaderKey, new byte[0], putParams).getValue());
 		} catch (OperationException ex) {
             LOG.error("Error while releasing leader identifier {} for consul session {}.", leaderIdentifier, sessionHolder.getSessionId(),
                     ex);

@@ -73,10 +73,10 @@ public class ConsulHaServices extends AbstractHaServices {
     private final Object lock = new Object();
 
 	/**
-     * {@link Supplier} that provides a new instance of a {@link ConsulClient} to get rid of maybe expired certificates that are renewed
+     * {@link ConsulClientProvider} that provides a new instance of a {@link ConsulClient} to get rid of maybe expired certificates that are renewed
      * under the hood.
      */
-    private final Supplier<ConsulClient> clientProvider;
+    private final ConsulClientProvider clientProvider;
 
 	private final ConsulSessionActivator consulSessionActivator;
 
@@ -87,8 +87,8 @@ public class ConsulHaServices extends AbstractHaServices {
     public ConsulHaServices(Executor executor,
 							Configuration configuration,
                             BlobStoreService blobStoreService,
-                            Supplier<ConsulClient> clientProvider,
-            ConsulSessionActivator consulSessionActivator) throws IOException {
+                            ConsulClientProvider clientProvider,
+                            ConsulSessionActivator consulSessionActivator) throws IOException {
         super(configuration, executor, blobStoreService, FileSystemJobResultStore.fromConfiguration(configuration));
         this.clientProvider = checkNotNull(clientProvider);
 		this.consulSessionActivator = checkNotNull(consulSessionActivator);

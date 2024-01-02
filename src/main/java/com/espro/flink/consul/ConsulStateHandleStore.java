@@ -4,7 +4,6 @@
 package com.espro.flink.consul;
 
 import static java.util.Collections.emptyList;
-
 import static org.apache.commons.lang3.StringUtils.removeEnd;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -14,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -28,7 +26,6 @@ import org.apache.flink.util.InstantiationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.kv.model.GetBinaryValue;
 
 /**
@@ -42,13 +39,13 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     private static final Logger LOG = LoggerFactory.getLogger(ConsulStateHandleStore.class);
 
-    private final Supplier<ConsulClient> clientProvider;
+    private final ConsulClientProvider clientProvider;
 
     private final RetrievableStateStorageHelper<T> storage;
 
     private final String basePathInConsul;
 
-    public ConsulStateHandleStore(Supplier<ConsulClient> clientProvider, RetrievableStateStorageHelper<T> storage,
+    public ConsulStateHandleStore(ConsulClientProvider clientProvider, RetrievableStateStorageHelper<T> storage,
             String basePathInConsul) {
         this.clientProvider = clientProvider;
         this.storage = storage;
@@ -68,7 +65,8 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
         try {
             byte[] serializedStoreHandle = InstantiationUtil.serializeObject(storeHandle);
-            success = clientProvider.get().setKVBinaryValue(fullConsulPathToKey, serializedStoreHandle).getValue();
+            success = clientProvider
+                    .executeWithSslRecovery(consulClient -> consulClient.setKVBinaryValue(fullConsulPathToKey, serializedStoreHandle).getValue());
             return storeHandle;
         } finally {
             if (!success) {
@@ -95,7 +93,8 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
         try {
             byte[] serializedStoreHandle = InstantiationUtil.serializeObject(newStateHandle);
-            success = clientProvider.get().setKVBinaryValue(fullConsulPathToKey, serializedStoreHandle).getValue();
+            success = clientProvider
+                    .executeWithSslRecovery(consulClient -> consulClient.setKVBinaryValue(fullConsulPathToKey, serializedStoreHandle).getValue());
         } finally {
             if (success) {
                 oldStateHandle.discardState();
@@ -111,7 +110,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
         String fullConsulPathToKey = normalizePath(keyName);
 
-        GetBinaryValue binaryValue = clientProvider.get().getKVBinaryValue(fullConsulPathToKey).getValue();
+        GetBinaryValue binaryValue = clientProvider.executeWithSslRecovery(consulClient -> consulClient.getKVBinaryValue(fullConsulPathToKey).getValue());
         if (binaryValue != null) {
             return IntegerResourceVersion.valueOf((int) binaryValue.getModifyIndex());
         } else {
@@ -130,7 +129,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     public List<Tuple2<RetrievableStateHandle<T>, String>> getAllAndLock() throws Exception {
         List<Tuple2<RetrievableStateHandle<T>, String>> stateHandles = new ArrayList<>();
 
-        List<GetBinaryValue> binaryValues = clientProvider.get().getKVBinaryValues(basePathInConsul).getValue();
+        List<GetBinaryValue> binaryValues = clientProvider.executeWithSslRecovery(consulClient -> consulClient.getKVBinaryValues(basePathInConsul).getValue());
         if (binaryValues == null || binaryValues.isEmpty()) {
             LOG.debug("No state handles present in Consul for key prefix {}", basePathInConsul);
             return Collections.emptyList();
@@ -148,7 +147,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     @Override
     public Collection<String> getAllHandles() throws Exception {
-        List<String> keys = clientProvider.get().getKVKeysOnly(basePathInConsul).getValue();
+        List<String> keys = clientProvider.executeWithSslRecovery(consulClient -> consulClient.getKVKeysOnly(basePathInConsul).getValue());
         if (keys != null) {
             return keys.stream()
                     // Remove base path
@@ -177,7 +176,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
         }
 
         try {
-            clientProvider.get().deleteKVValue(fullConsulPathToKey);
+            clientProvider.executeWithSslRecovery(consulClient -> consulClient.deleteKVValue(fullConsulPathToKey));
             LOG.info("Value for key {} in Consul was deleted.", fullConsulPathToKey);
         } catch (Exception e) {
             LOG.info("Error while deleting state handle for path {}", fullConsulPathToKey, e);
@@ -214,7 +213,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
     public void clearEntries() throws Exception {
         Collection<String> allPathsInConsul = getAllHandles();
         for (String pathInConsul : allPathsInConsul) {
-            clientProvider.get().deleteKVValue(pathInConsul);
+            clientProvider.executeWithSslRecovery(consulClient -> consulClient.deleteKVValue(pathInConsul));
             LOG.info("Value for key {} in Consul was deleted.", pathInConsul);
         }
     }
@@ -231,7 +230,7 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
 
     private RetrievableStateHandle<T> get(String path) {
         try {
-            GetBinaryValue binaryValue = clientProvider.get().getKVBinaryValue(path).getValue();
+            GetBinaryValue binaryValue = clientProvider.executeWithSslRecovery(consulClient -> consulClient.getKVBinaryValue(path).getValue());
 
             return InstantiationUtil.<RetrievableStateHandle<T>>deserializeObject(
                     binaryValue.getValue(),
