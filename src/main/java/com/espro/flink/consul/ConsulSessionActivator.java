@@ -6,14 +6,12 @@ import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.OperationException;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.session.model.NewSession;
@@ -26,7 +24,7 @@ public final class ConsulSessionActivator {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ConsulSessionActivator.class);
 
-    private final Supplier<ConsulClient> clientProvider;
+    private final ConsulClientProvider clientProvider;
     private final ScheduledExecutorService executorService;
     private final Duration sessionTtl;
 	private volatile boolean running;
@@ -37,7 +35,7 @@ public final class ConsulSessionActivator {
      * @param executor runs session keep-alive background task
      * @param sessionTtl session ttl in seconds
      */
-    public ConsulSessionActivator(Supplier<ConsulClient> clientProvider, Configuration configuration) {
+    public ConsulSessionActivator(ConsulClientProvider clientProvider, Configuration configuration) {
         this.clientProvider = Preconditions.checkNotNull(clientProvider, "client");
         this.executorService = Executors.newSingleThreadScheduledExecutor();
         this.sessionTtl = Duration.ofSeconds(configuration.getInteger(HA_CONSUL_SESSION_TTL));
@@ -94,7 +92,7 @@ public final class ConsulSessionActivator {
             NewSession newSession = new NewSession();
             newSession.setName("flink");
             newSession.setTtl(String.format("%ds", Math.max(10, sessionTtl.toMillis() / 1000)));
-            holder.setSessionId(clientProvider.get().sessionCreate(newSession, QueryParams.DEFAULT).getValue());
+            holder.setSessionId(clientProvider.executeWithSslRecovery(consulClient -> consulClient.sessionCreate(newSession, QueryParams.DEFAULT).getValue()));
             Log.info("New consul session is created {}", holder.getSessionId());
             scheduleRenewalOfSession();
         } catch (Exception e) {
@@ -105,7 +103,7 @@ public final class ConsulSessionActivator {
 
 	private void renewConsulSession() {
 		try {
-            clientProvider.get().renewSession(holder.getSessionId(), QueryParams.DEFAULT);
+            clientProvider.executeWithSslRecovery(consulClient -> consulClient.renewSession(holder.getSessionId(), QueryParams.DEFAULT));
             scheduleRenewalOfSession();
         } catch (OperationException e) {
             LOG.warn("Consul session renew failed, a new session is created.", e);
@@ -118,7 +116,7 @@ public final class ConsulSessionActivator {
 
 	private void destroyConsulSession() {
 		try {
-            clientProvider.get().sessionDestroy(holder.getSessionId(), QueryParams.DEFAULT);
+            clientProvider.executeWithSslRecovery(consulClient -> consulClient.sessionDestroy(holder.getSessionId(), QueryParams.DEFAULT));
 		} catch (Exception e) {
 			LOG.error("Consul session destroy failed", e);
 		}

@@ -4,13 +4,12 @@
 package com.espro.flink.consul.leader;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
 import org.apache.flink.runtime.leaderelection.LeaderInformation;
 import org.apache.flink.runtime.leaderelection.MultipleComponentLeaderElectionDriver;
 import org.apache.flink.util.Preconditions;
 
-import com.ecwid.consul.v1.ConsulClient;
+import com.espro.flink.consul.ConsulClientProvider;
 import com.espro.flink.consul.ConsulSessionHolder;
 import com.espro.flink.consul.ConsulUtils;
 
@@ -21,11 +20,12 @@ public class ConsulLeaderElectionDriver implements MultipleComponentLeaderElecti
 
     private final MultipleComponentLeaderElectionDriver.Listener leaderElectionListener;
     private final ConsulLeaderLatch leaderLatch;
-    private final Supplier<ConsulClient> clientProvider;
+
+    private final ConsulClientProvider clientProvider;
 
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    public ConsulLeaderElectionDriver(Supplier<ConsulClient> clientProvider, ConsulSessionHolder sessionHolder, String leaderBasePath,
+    public ConsulLeaderElectionDriver(ConsulClientProvider clientProvider, ConsulSessionHolder sessionHolder, String leaderBasePath,
             MultipleComponentLeaderElectionDriver.Listener leaderElectionListener) {
         this.clientProvider = clientProvider;
         this.leaderElectionListener = leaderElectionListener;
@@ -65,7 +65,7 @@ public class ConsulLeaderElectionDriver implements MultipleComponentLeaderElecti
 
         boolean dataWritten = false;
         while (!dataWritten && leaderLatch.hasLeadership()) {
-            Boolean response = clientProvider.get().setKVBinaryValue(componentPath, data).getValue();
+            Boolean response = clientProvider.executeWithSslRecovery(consulClient -> consulClient.setKVBinaryValue(componentPath, data).getValue());
             dataWritten = response != null && response;
         }
     }
@@ -73,7 +73,7 @@ public class ConsulLeaderElectionDriver implements MultipleComponentLeaderElecti
     @Override
     public void deleteLeaderInformation(String componentId) throws Exception {
         String componentPath = ConsulUtils.generateConsulPath(componentId);
-        clientProvider.get().deleteKVValue(componentPath);
+        clientProvider.executeWithSslRecovery(consulClient -> consulClient.deleteKVValue(componentPath));
     }
 
     @Override

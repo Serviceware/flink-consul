@@ -2,7 +2,6 @@ package com.espro.flink.consul.checkpoint;
 
 import java.util.Collection;
 import java.util.concurrent.Executor;
-import java.util.function.Supplier;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
@@ -20,17 +19,17 @@ import org.apache.flink.runtime.state.SharedStateRegistry;
 import org.apache.flink.runtime.state.SharedStateRegistryFactory;
 import org.apache.flink.util.Preconditions;
 
-import com.ecwid.consul.v1.ConsulClient;
+import com.espro.flink.consul.ConsulClientProvider;
 import com.espro.flink.consul.ConsulStateHandleStore;
 import com.espro.flink.consul.configuration.ConsulHighAvailabilityOptions;
 
 public final class ConsulCheckpointRecoveryFactory implements CheckpointRecoveryFactory {
 
-    private final Supplier<ConsulClient> client;
+    private final ConsulClientProvider client;
 	private final Configuration configuration;
 	private final Executor executor;
 
-	public ConsulCheckpointRecoveryFactory(Supplier<ConsulClient> client, Configuration configuration, Executor executor) {
+    public ConsulCheckpointRecoveryFactory(ConsulClientProvider client, Configuration configuration, Executor executor) {
 		this.executor = executor;
 		this.client = Preconditions.checkNotNull(client, "client");
 		this.configuration = Preconditions.checkNotNull(configuration, "configuration");

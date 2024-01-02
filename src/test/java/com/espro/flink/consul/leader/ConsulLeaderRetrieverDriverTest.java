@@ -24,6 +24,8 @@ import org.mockito.Mockito;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.espro.flink.consul.AbstractConsulTest;
+import com.espro.flink.consul.ConsulClientProvider;
+import com.espro.flink.consul.ConsulClientProviderImpl;
 
 /**
  * Verifies that the {@link LeaderRetrievalEventHandler} is called correctly by {@link ConsulLeaderRetrieverDriver}
@@ -37,16 +39,16 @@ public class ConsulLeaderRetrieverDriverTest extends AbstractConsulTest {
     private LeaderRetrievalEventHandler leaderRetrievalEventHandler;
     private FatalErrorHandler fatalErrorHandler;
 
-    private ConsulClient client;
+    private ConsulClientProvider clientProviderImpl;
 
     @Before
     public void setup() {
         leaderRetrievalEventHandler = Mockito.mock(LeaderRetrievalEventHandler.class);
         fatalErrorHandler = Mockito.mock(FatalErrorHandler.class);
 
-        client = new ConsulClient("localhost", consul.getHttpPort());
+        clientProviderImpl = new ConsulClientProviderImpl(new ConsulClient("localhost", consul.getHttpPort()));
 
-        consulLeaderRetrieverDriver = new ConsulLeaderRetrieverDriver(() -> client, CONSUL_KV_PATH, leaderRetrievalEventHandler,
+        consulLeaderRetrieverDriver = new ConsulLeaderRetrieverDriver(clientProviderImpl, CONSUL_KV_PATH, leaderRetrievalEventHandler,
                 fatalErrorHandler, 2);
         consulLeaderRetrieverDriver.start();
     }
@@ -78,7 +80,7 @@ public class ConsulLeaderRetrieverDriverTest extends AbstractConsulTest {
     }
 
     private void writeLeaderInformation(LeaderInformation leaderInformation) throws Exception {
-        Boolean response = client
+        Boolean response = clientProviderImpl.get()
                 .setKVBinaryValue(generateConnectionInformationPath(CONSUL_KV_PATH), leaderInformationToBytes(leaderInformation))
                 .getValue();
         if (response == null || !response) {
