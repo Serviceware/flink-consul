@@ -33,6 +33,7 @@ import com.ecwid.consul.transport.TransportException;
 import com.ecwid.consul.v1.ConsulClient;
 
 import nl.altindag.ssl.SSLFactory;
+import nl.altindag.ssl.SSLFactory.Builder;
 import nl.altindag.ssl.util.SSLFactoryUtils;
 
 /**
@@ -74,20 +75,16 @@ public class ConsulClientProviderImpl implements ConsulClientProvider, Closeable
         int consulPort = configuration.getInteger(HA_CONSUL_PORT);
 
         if (configuration.getBoolean(HA_CONSUL_TLS_ENABLED)) {
-            SSLFactory sslContextFactory = createSSlFactory(configuration);
+            SSLFactory sslContextFactory = createSSlFactory(configuration, true);
 
-            sslUpdater = () -> {
-                try {
-                    SSLFactory updatedSslFactory = createSSlFactory(configuration);
-                    SSLFactoryUtils.reload(sslContextFactory, updatedSslFactory);
-                } catch (Exception e) {
-                    LOG.error("Error while updating ssl context for communication with Consul.");
-                }
-            };
+            sslUpdater = new SslFactoryReloader(configuration, sslContextFactory);
             // initial update
             sslUpdater.run();
 
-            // SSL context is updated every 5 minutes
+            /*
+             * SSL context is updated every 5 minutes, it is assumed that the underlying trust material is updated
+             * before it expires. Therefore the old certificates should be valid for more than 5 minutes.
+             */
             executorService.scheduleAtFixedRate(sslUpdater, 5, 5, TimeUnit.MINUTES);
 
             consulClient = ConsulClientFactory.createSecuredHttpClient(consulHost, consulPort, sslContextFactory, configuration);
@@ -96,7 +93,7 @@ public class ConsulClientProviderImpl implements ConsulClientProvider, Closeable
         }
     }
 
-    private static SSLFactory createSSlFactory(Configuration configuration) {
+    private static SSLFactory createSSlFactory(Configuration configuration, boolean isSwappable) {
         String keyStorePath = checkNotNull(configuration.getString(HA_CONSUL_TLS_KEYSTORE_PATH), "No keystore path given!");
         String keyStorePassword = configuration.getString(HA_CONSUL_TLS_KEYSTORE_PASSWORD);
         String keyStoreType = checkNotNull(configuration.getString(HA_CONSUL_TLS_KEYSTORE_TYPE), "No keystore type given!");
@@ -110,14 +107,19 @@ public class ConsulClientProviderImpl implements ConsulClientProvider, Closeable
         char[] keyStorePasswordCharArray = keyStorePassword != null ? keyStorePassword.toCharArray() : null;
         char[] trustStorePasswordCharArray = trustStorePassword != null ? trustStorePassword.toCharArray() : null;
 
-        return SSLFactory.builder()
+        Builder sslFactoryBuilder = SSLFactory.builder()
                 .withIdentityMaterial(Paths.get(URI.create(keyStorePath)), keyStorePasswordCharArray, trustStorePasswordCharArray, keyStoreType)
                 .withTrustMaterial(Paths.get(URI.create(trustStorePath)), trustStorePasswordCharArray, trustStoreType)
                 .withSslContextAlgorithm(protocol)
-                .withSecureRandom(new SecureRandom())
+                .withSecureRandom(new SecureRandom());
+
+        if (isSwappable) {
+            sslFactoryBuilder
                 .withSwappableIdentityMaterial()
-                .withSwappableTrustMaterial()
-                .build();
+                    .withSwappableTrustMaterial();
+        }
+
+        return sslFactoryBuilder.build();
     }
 
     @Override
@@ -146,5 +148,30 @@ public class ConsulClientProviderImpl implements ConsulClientProvider, Closeable
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static class SslFactoryReloader implements Runnable {
+
+        private static final Logger LOG = LoggerFactory.getLogger(SslFactoryReloader.class);
+
+        private final Configuration configuration;
+        private final SSLFactory currentSslFactory;
+
+        public SslFactoryReloader(Configuration configuration, SSLFactory currentSslFactory) {
+            this.configuration = configuration;
+            this.currentSslFactory = currentSslFactory;
+        }
+
+        @Override
+        public void run() {
+            try {
+                SSLFactory updatedSslFactory = createSSlFactory(configuration, false);
+                SSLFactoryUtils.reload(currentSslFactory, updatedSslFactory);
+                LOG.info("Keystore and Truststore are reloaded successfully for Consul client.");
+            } catch (Exception e) {
+                LOG.error("Error while updating ssl context for communication with Consul.", e);
+            }
+        }
+
     }
 }
