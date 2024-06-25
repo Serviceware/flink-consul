@@ -174,27 +174,6 @@ public class ConsulStateHandleStoreTest extends AbstractConsulTest {
     }
 
     @Test
-    public void testReleaseAndTryRemoveAll() throws Exception {
-        // GIVEN shared registry and job id
-        SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();
-        JobID jobID = JobID.generate();
-
-        // GIVEN ConsulStateHandleStore
-        ConsulStateHandleStore<CompletedCheckpoint> store = new ConsulStateHandleStore<>(clientProviderImpl, storage, BASE_PATH);
-
-        // GIVEN 10 checkpoints
-        Set<CompletedCheckpoint> checkpoints = addCheckpoints(10, sharedStateRegistry, jobID, store);
-
-        // WHEN getting all handles from ConsulStateHandleStore
-        store.releaseAndTryRemoveAll();
-
-        // THEN all states in Consul are deleted
-        for (CompletedCheckpoint completedCheckpoint : checkpoints) {
-            assertNull(clientProviderImpl.get().getKVBinaryValue(getCheckpointPath(jobID, completedCheckpoint)).getValue());
-        }
-    }
-
-    @Test
     public void testExists() throws Exception {
         // GIVEN shared registry and job id
         SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl();

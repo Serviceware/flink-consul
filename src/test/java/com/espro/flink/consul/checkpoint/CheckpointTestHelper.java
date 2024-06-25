@@ -3,9 +3,6 @@
  */
 package com.espro.flink.consul.checkpoint;
 
-import static org.junit.Assert.assertTrue;
-
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -16,8 +13,6 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.checkpoint.CheckpointProperties;
 import org.apache.flink.runtime.checkpoint.CheckpointRetentionPolicy;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
-import org.apache.flink.runtime.checkpoint.CompletedCheckpointStoreTest;
-import org.apache.flink.runtime.checkpoint.CompletedCheckpointStoreTest.TestOperatorSubtaskState;
 import org.apache.flink.runtime.checkpoint.OperatorState;
 import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -48,37 +43,13 @@ public class CheckpointTestHelper {
         operatorGroupState.put(operatorID, operatorState);
 
         for (int i = 0; i < numberOfStates; i++) {
-            OperatorSubtaskState subtaskState = new TestOperatorSubtaskState();
-
+            OperatorSubtaskState subtaskState = OperatorSubtaskState.builder().build();
             operatorState.putState(i, subtaskState);
         }
 
         operatorState.registerSharedStates(sharedStateRegistry, id);
 
         return new TestCompletedCheckpoint(new JobID(), id, 0, operatorGroupState, props);
-    }
-
-    /**
-     * Taken from {@link CompletedCheckpointStoreTest}.
-     *
-     * @param completedCheckpoint
-     */
-    public static void verifyCheckpointDiscarded(TestCompletedCheckpoint completedCheckpoint) {
-        assertTrue(completedCheckpoint.isDiscarded());
-        verifyCheckpointDiscarded(completedCheckpoint.getOperatorStates().values());
-    }
-
-    /**
-     * Taken from {@link CompletedCheckpointStoreTest}.
-     *
-     * @param operatorStates
-     */
-    private static void verifyCheckpointDiscarded(Collection<OperatorState> operatorStates) {
-        for (OperatorState operatorState : operatorStates) {
-            for (OperatorSubtaskState subtaskState : operatorState.getStates()) {
-                assertTrue(((TestOperatorSubtaskState) subtaskState).isDiscarded());
-            }
-        }
     }
 
     protected static class TestCompletedCheckpoint extends CompletedCheckpoint {

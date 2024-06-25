@@ -28,7 +28,7 @@ import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalDriver;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalEventHandler;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
-import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
