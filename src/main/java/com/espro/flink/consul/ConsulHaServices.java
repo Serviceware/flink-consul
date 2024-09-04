@@ -18,16 +18,11 @@
 
 package com.espro.flink.consul;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 import static com.espro.flink.consul.ConsulHaConfigurationUtils.leaderPathFromConfiguration;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import java.io.IOException;
 import java.util.concurrent.Executor;
-import java.util.function.Supplier;
-
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.GuardedBy;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
@@ -40,15 +35,9 @@ import org.apache.flink.runtime.highavailability.HighAvailabilityServicesUtils;
 import org.apache.flink.runtime.jobmanager.DefaultJobGraphStore;
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.jobmanager.NoOpJobGraphStoreWatcher;
-import org.apache.flink.runtime.leaderelection.DefaultLeaderElectionService;
-import org.apache.flink.runtime.leaderelection.DefaultMultipleComponentLeaderElectionService;
-import org.apache.flink.runtime.leaderelection.LeaderElectionService;
-import org.apache.flink.runtime.leaderelection.MultipleComponentLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.DefaultLeaderRetrievalService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.persistence.filesystem.FileSystemStateStorageHelper;
-import org.apache.flink.util.FatalExitExceptionHandler;
-import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import com.ecwid.consul.v1.ConsulClient;
@@ -70,8 +59,6 @@ public class ConsulHaServices extends AbstractHaServices {
 
     private static final String REST_SERVER_LEADER_PATH = "rest_server_lock";
 
-    private final Object lock = new Object();
-
 	/**
      * {@link ConsulClientProvider} that provides a new instance of a {@link ConsulClient} to get rid of maybe expired certificates that are renewed
      * under the hood.
@@ -80,16 +67,16 @@ public class ConsulHaServices extends AbstractHaServices {
 
 	private final ConsulSessionActivator consulSessionActivator;
 
-    @Nullable
-    @GuardedBy("lock")
-    private MultipleComponentLeaderElectionService multipleComponentLeaderElectionService = null;
-
     public ConsulHaServices(Executor executor,
 							Configuration configuration,
                             BlobStoreService blobStoreService,
                             ConsulClientProvider clientProvider,
                             ConsulSessionActivator consulSessionActivator) throws IOException {
-        super(configuration, executor, blobStoreService, FileSystemJobResultStore.fromConfiguration(configuration));
+        super(configuration,
+                new ConsulLeaderElectionDriverFactory(clientProvider, consulSessionActivator.getHolder()),
+                executor,
+                blobStoreService,
+                FileSystemJobResultStore.fromConfiguration(configuration, executor));
         this.clientProvider = checkNotNull(clientProvider);
 		this.consulSessionActivator = checkNotNull(consulSessionActivator);
 	}
@@ -132,33 +119,6 @@ public class ConsulHaServices extends AbstractHaServices {
         return new DefaultJobGraphStore<>(new ConsulStateHandleStore<>(clientProvider, new FileSystemStateStorageHelper<>(
                 HighAvailabilityServicesUtils.getClusterHighAvailableStoragePath(configuration), "jobGraph"), jobgraphsPath),
                 NoOpJobGraphStoreWatcher.INSTANCE, new ConsulJobGraphStoreUtil(jobgraphsPath));
-    }
-
-    @Override
-    protected LeaderElectionService createLeaderElectionService(String leaderName) {
-        return new DefaultLeaderElectionService(
-                getOrInitializeSingleLeaderElectionService(leaderName).createDriverFactory(leaderName));
-    }
-
-    private MultipleComponentLeaderElectionService getOrInitializeSingleLeaderElectionService(String leaderName) {
-        synchronized (lock) {
-            if (multipleComponentLeaderElectionService == null) {
-                try {
-                    multipleComponentLeaderElectionService = new DefaultMultipleComponentLeaderElectionService(
-                            error -> FatalExitExceptionHandler.INSTANCE.uncaughtException(Thread.currentThread(), error),
-                            new ConsulLeaderElectionDriverFactory(clientProvider, consulSessionActivator.getHolder(), leaderName));
-                } catch (Exception e) {
-                    throw new FlinkRuntimeException(
-                            String.format(
-                                    "Could not initialize the %s",
-                                    DefaultMultipleComponentLeaderElectionService.class
-                                            .getSimpleName()),
-                            e);
-                }
-            }
-
-            return multipleComponentLeaderElectionService;
-        }
     }
 
 	@Override

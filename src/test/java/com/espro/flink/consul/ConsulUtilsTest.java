@@ -26,6 +26,6 @@ public class ConsulUtilsTest {
 
     @Test
     public void testGetLeaderLatchPath() {
-        assertEquals("foo/bar/latch", ConsulUtils.getLeaderLatchPath("foo/bar"));
+        assertEquals("latch", ConsulUtils.getLeaderLatchPath());
     }
 }

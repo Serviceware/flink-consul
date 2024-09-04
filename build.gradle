@@ -5,11 +5,11 @@ plugins {
 }
 
 group 'com.espro.flink'
-version '1.10.4-sw'
+version '1.11.0-sw'
 
 apply plugin: 'java'
 
-def flinkVersion = "1.16.2"
+def flinkVersion = "1.19.1"
 
 repositories {
     //mavenLocal()
@@ -22,8 +22,8 @@ configurations {
 
 dependencies {
     implementation 'com.ecwid.consul:consul-api:1.4.5'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    implementation 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.9'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.11'
     implementation "org.apache.flink:flink-runtime:$flinkVersion"
 
     testImplementation "junit:junit:4.12"
@@ -33,7 +33,7 @@ dependencies {
     testImplementation "org.apache.flink:flink-test-utils:$flinkVersion"
 
     shadow 'com.ecwid.consul:consul-api:1.4.5'
-    shadow 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.9'
+    shadow 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.11'
 }
 
 shadowJar {

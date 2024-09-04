@@ -21,7 +21,6 @@ import org.apache.flink.runtime.persistence.IntegerResourceVersion;
 import org.apache.flink.runtime.persistence.RetrievableStateStorageHelper;
 import org.apache.flink.runtime.persistence.StateHandleStore;
 import org.apache.flink.runtime.state.RetrievableStateHandle;
-import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.InstantiationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,25 +187,6 @@ public class ConsulStateHandleStore<T extends Serializable> implements StateHand
         }
 
         return true;
-    }
-
-    @Override
-    public void releaseAndTryRemoveAll() throws Exception {
-        Collection<String> allPathsInConsul = getAllHandles();
-
-        Exception exception = null;
-
-        for (String pathInConsul : allPathsInConsul) {
-            try {
-                releaseAndTryRemove(pathInConsul);
-            } catch (Exception e) {
-                exception = ExceptionUtils.firstOrSuppressed(e, exception);
-            }
-        }
-
-        if (exception != null) {
-            throw new Exception("Could not properly release and try removing all states.", exception);
-        }
     }
 
     @Override
