@@ -74,6 +74,7 @@ final class ConsulClientFactory {
 
             HttpClientBuilder httpClientBuilder = HttpClientBuilder.create()
                     .disableAutomaticRetries()
+                    .disableConnectionState()
                     .setConnectionManager(connectionManager)
                     .setDefaultRequestConfig(requestConfig);
 
