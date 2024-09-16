@@ -31,6 +31,8 @@ import org.slf4j.LoggerFactory;
 
 import com.ecwid.consul.transport.TransportException;
 import com.ecwid.consul.v1.ConsulClient;
+import com.ecwid.consul.v1.Response;
+import com.ecwid.consul.v1.kv.model.GetBinaryValue;
 
 import nl.altindag.ssl.SSLFactory;
 import nl.altindag.ssl.SSLFactory.Builder;
@@ -173,5 +175,27 @@ public class ConsulClientProviderImpl implements ConsulClientProvider, Closeable
             }
         }
 
+    }
+
+    public static void main(String[] args) {
+        Configuration conf = new Configuration();
+        conf.setString(HA_CONSUL_HOST, "https://consul03.patty-production.fsn1.swops.cloud");
+        conf.setInteger(HA_CONSUL_PORT, 8501);
+        conf.setBoolean(HA_CONSUL_TLS_ENABLED, true);
+
+        conf.setString(HA_CONSUL_TLS_KEYSTORE_PATH, "file:/Users/phoffmann/certs/consul-patty/consul.pfx");
+        conf.setString(HA_CONSUL_TLS_KEYSTORE_PASSWORD, "Changeit");
+        conf.setString(HA_CONSUL_TLS_KEYSTORE_TYPE, "PKCS12");
+        conf.setString(HA_CONSUL_TLS_TRUSTSTORE_PATH, "file:/Users/phoffmann/certs/consul-patty/ca.p12");
+        conf.setString(HA_CONSUL_TLS_TRUSTSTORE_TYPE, "PKCS12");
+        conf.setString(HA_CONSUL_TLS_TRUSTSTORE_PASSWORD, "Changeit");
+
+        SSLFactory sSlFactory = createSSlFactory(conf, false);
+
+        ConsulClient consulClient = ConsulClientFactory.createSecuredHttpClient("https://consul03.patty-production.fsn1.swops.cloud", 8501, sSlFactory, conf);
+
+        Response<GetBinaryValue> kvBinaryValue = consulClient
+                .getKVBinaryValue("nomad/staging-knowledge-bi-flink/config/loggers/de.serviceware.flink.s3.hadoop");
+        kvBinaryValue = consulClient.getKVBinaryValue("nomad/staging-knowledge-bi-flink/config/loggers/de.serviceware.flink.s3.hadoop");
     }
 }
