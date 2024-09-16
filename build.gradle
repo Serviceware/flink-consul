@@ -27,8 +27,8 @@ dependencies {
     implementation "org.apache.flink:flink-runtime:$flinkVersion"
 
     testImplementation "junit:junit:4.12"
-    testImplementation "org.mockito:mockito-core:1.10.19"
-    testImplementation 'com.pszymczyk.consul:embedded-consul:2.1.4'
+    testImplementation "org.mockito:mockito-core:5.13.0"
+    testImplementation 'com.pszymczyk.consul:embedded-consul:2.2.1'
     testImplementation 'org.awaitility:awaitility:4.0.3'
     testImplementation "org.apache.flink:flink-test-utils:$flinkVersion"
 

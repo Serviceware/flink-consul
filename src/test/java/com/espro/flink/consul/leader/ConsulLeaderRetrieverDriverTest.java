@@ -3,7 +3,7 @@ package com.espro.flink.consul.leader;
 import static com.espro.flink.consul.ConsulUtils.generateConnectionInformationPath;
 import static com.espro.flink.consul.ConsulUtils.leaderInformationToBytes;
 import static org.apache.flink.runtime.leaderelection.LeaderInformation.empty;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
