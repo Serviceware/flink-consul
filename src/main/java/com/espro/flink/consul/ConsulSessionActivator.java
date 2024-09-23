@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import com.ecwid.consul.v1.OperationException;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.session.model.NewSession;
-import com.esotericsoftware.minlog.Log;
 
 /**
  * Keeps Consul session active.
@@ -93,7 +92,7 @@ public final class ConsulSessionActivator {
             newSession.setName("flink");
             newSession.setTtl(String.format("%ds", Math.max(10, sessionTtl.toMillis() / 1000)));
             holder.setSessionId(clientProvider.executeWithSslRecovery(consulClient -> consulClient.sessionCreate(newSession, QueryParams.DEFAULT).getValue()));
-            Log.info("New consul session is created {}", holder.getSessionId());
+            LOG.info("New consul session is created {}", holder.getSessionId());
             scheduleRenewalOfSession();
         } catch (Exception e) {
             LOG.error("Error while creating new consul session", e);
