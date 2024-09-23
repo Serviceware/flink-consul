@@ -25,7 +25,8 @@ configurations {
 dependencies {
     implementation 'com.ecwid.consul:consul-api:1.4.5'
     implementation 'org.apache.httpcomponents:httpclient:4.5.14'
-    implementation 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.11'
+    // We need to pin this version to 7.4.6, because it is the last version using slf4 1.7.x
+    implementation 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.6'
     implementation "org.apache.flink:flink-runtime:$flinkVersion"
 
     testImplementation "junit:junit:4.12"
@@ -41,15 +42,11 @@ dependencies {
 shadowJar {
     configurations = [project.configurations.shadow]
     classifier = ''
-    dependencies {
-        exclude(dependency('org.slf4j:slf4j-api'))
-    }
 }
 
 task relocateShadowJar(type: ConfigureShadowRelocation) {
     target = tasks.shadowJar
     prefix = "shadow.consul"
-
 }
 
 tasks.shadowJar.dependsOn tasks.relocateShadowJar
