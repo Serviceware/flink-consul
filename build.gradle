@@ -36,7 +36,7 @@ dependencies {
     testImplementation "org.apache.flink:flink-test-utils:$flinkVersion"
 
     shadow 'com.ecwid.consul:consul-api:1.4.5'
-    shadow 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.11'
+    shadow 'io.github.hakky54:sslcontext-kickstart-for-apache4:7.4.6'
 }
 
 shadowJar {
