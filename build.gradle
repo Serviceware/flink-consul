@@ -17,7 +17,9 @@ repositories {
 }
 
 configurations {
-    shadow { transitive = true }
+    shadow {
+        transitive = true
+    }
 }
 
 dependencies {
@@ -39,6 +41,9 @@ dependencies {
 shadowJar {
     configurations = [project.configurations.shadow]
     classifier = ''
+    dependencies {
+        exclude(dependency('org.slf4j:slf4j-api'))
+    }
 }
 
 task relocateShadowJar(type: ConfigureShadowRelocation) {
