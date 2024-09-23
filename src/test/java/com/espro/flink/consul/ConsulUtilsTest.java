@@ -26,6 +26,6 @@ public class ConsulUtilsTest {
 
     @Test
     public void testGetLeaderLatchPath() {
-        assertEquals("latch", ConsulUtils.getLeaderLatchPath());
+        assertEquals("nomad/labs-knowledge-bi-flink/leader/latch", ConsulUtils.getLeaderLatchPath("/nomad/labs-knowledge-bi-flink/leader/"));
     }
 }

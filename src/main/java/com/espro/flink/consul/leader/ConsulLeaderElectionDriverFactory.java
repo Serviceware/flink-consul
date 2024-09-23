@@ -18,14 +18,17 @@ public class ConsulLeaderElectionDriverFactory implements LeaderElectionDriverFa
     private final ConsulClientProvider clientProvider;
     private final ConsulSessionHolder sessionHolder;
 
-    public ConsulLeaderElectionDriverFactory(ConsulClientProvider clientProvider, ConsulSessionHolder sessionHolder) {
+    private final String leaderPath;
+
+    public ConsulLeaderElectionDriverFactory(ConsulClientProvider clientProvider, ConsulSessionHolder sessionHolder, String leaderPath) {
         this.clientProvider = clientProvider;
         this.sessionHolder = sessionHolder;
+        this.leaderPath = leaderPath;
     }
 
     @Override
     public LeaderElectionDriver create(LeaderElectionDriver.Listener leaderElectionListener) throws Exception {
-        return new ConsulLeaderElectionDriver(clientProvider, sessionHolder, leaderElectionListener);
+        return new ConsulLeaderElectionDriver(clientProvider, sessionHolder, leaderElectionListener, leaderPath);
     }
 
 }

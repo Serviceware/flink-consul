@@ -73,7 +73,7 @@ public class ConsulHaServices extends AbstractHaServices {
                             ConsulClientProvider clientProvider,
                             ConsulSessionActivator consulSessionActivator) throws IOException {
         super(configuration,
-                new ConsulLeaderElectionDriverFactory(clientProvider, consulSessionActivator.getHolder()),
+                new ConsulLeaderElectionDriverFactory(clientProvider, consulSessionActivator.getHolder(), leaderPathFromConfiguration(configuration)),
                 executor,
                 blobStoreService,
                 FileSystemJobResultStore.fromConfiguration(configuration, executor));

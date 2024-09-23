@@ -75,10 +75,11 @@ public final class ConsulUtils {
     /**
      * Creates a Consul path for the K/V store for the leader election latch
      *
+     * @param basePath - base path in consul k/v
      * @return path to key that holds information for latch
      */
-    public static String getLeaderLatchPath() {
-        return generateConsulPath(LEADER_LATCH_NODE);
+    public static String getLeaderLatchPath(String basePath) {
+        return generateConsulPath(basePath, LEADER_LATCH_NODE);
     }
 
     /**

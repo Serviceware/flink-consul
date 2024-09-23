@@ -31,11 +31,11 @@ public class ConsulLeaderElectionDriver implements LeaderElectionDriver, ConsulL
     private final AtomicBoolean running = new AtomicBoolean(true);
 
     public ConsulLeaderElectionDriver(ConsulClientProvider clientProvider, ConsulSessionHolder sessionHolder,
-            LeaderElectionDriver.Listener leaderElectionListener) {
+            LeaderElectionDriver.Listener leaderElectionListener, String leaderPath) {
         this.clientProvider = clientProvider;
         this.leaderElectionListener = leaderElectionListener;
 
-        this.leaderLatch = new ConsulLeaderLatch(clientProvider, sessionHolder, ConsulUtils.getLeaderLatchPath(), this, 2);
+        this.leaderLatch = new ConsulLeaderLatch(clientProvider, sessionHolder, ConsulUtils.getLeaderLatchPath(leaderPath), this, 2);
         leaderLatch.start();
     }
 
